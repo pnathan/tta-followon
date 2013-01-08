@@ -1,0 +1,22 @@
+0@0@0   A-.----00010a1c (write_pswitch_reg   +  8) : getr    r3 0x00000002 , i 0x00000002  @2528
+0@0@0   A-.----00010a1e (write_pswitch_reg   +  a) : ldc     r11 0x0000c20c , i 0x0000c20c  @2532
+0@0@0   A-.----00010a22 (write_switch_reg    +  0) : shl     r0 0x00000000 , r0 0x00000000 , i 0x00000010  @2536
+0@0@0   A-.----00010a24 (write_switch_reg    +  2) : or      r0 0x0000c20c , r0 0x00000000 , r11 0x0000c20c  @2540
+0@0@0   A-.----00010a26 (write_switch_reg    +  4) : setd    res[r3 0x00000002 ], r0 0x0000c20c  @2544
+0@0@0   A-.----00010a28 (write_switch_reg    +  6) : ldc     r11 0x000000c0 , i 0x000000c0  @2548
+0@0@0   A-.----00010a2c (write_switch_reg    +  a) : outct   res[r3 0x00000002 ], r11 0x000000c0  @2552
+0@0@0   A-.----00010a2e (write_switch_reg    +  c) : shr     r0 0x00000000 , r3 0x00000002 , i 0x00000008  @2556
+0@0@0   A-.----00010a30 (write_switch_reg    +  e) : shl     r0 0x00000000 , r0 0x00000000 , i 0x00000008  @2560
+0@0@0   A-.----00010a32 (write_switch_reg    + 10) : shr     r11 0x00000000 , r1 0x00000020 , i 0x00000008  @2564
+0@0@0   A-.----00010a34 (write_switch_reg    + 12) : or      r0 0x00000000 , r0 0x00000000 , r11 0x00000000  @2568
+0@0@0   A-.----00010a36 (write_switch_reg    + 14) : out     res[r3 0x00000002 ], r0 0x00000000  @2572
+0@0@0   A-.----00010a38 (write_switch_reg    + 16) : outt    res[r3 0x00000002 ], r1 0x00000020  @2576
+0@0@0   A-.----00010a3a (write_switch_reg    + 18) : out     res[r3 0x00000002 ], r2 0x00010142  @2580
+0@0@0   A-.----00010a3c (write_switch_reg    + 1a) : outct   res[r3 0x00000002 ], i 0x00000001  @2584
+0@0@0 P A-.----00010a3e (write_switch_reg    + 1c) : inct    r0 0x00000000 , res[r3 0x00000002 ] @2588
+0@0@0   A-.----00010a3e (write_switch_reg    + 1c) : inct    r0 0x00000003 , res[r3 0x00000002 ] @2593
+0@0@0   A-.----00010a40 (write_switch_reg    + 1e) : eq      r0 0x00000001 , r0 0x00000003 , i 0x00000003  @2597
+0@0@0   A-.----00010a42 (write_switch_reg    + 20) : chkct   res[r3 0x00000002 ], i 0x00000001  @2601
+0@0@0   A-.----00010a44 (write_switch_reg    + 22) : freer   res[r3 0x00000002 ] @2605
+0@0@0   A-.----00010a46 (write_switch_reg    + 24) : retsp   i 0x00000000  L[0x00000000] @2609
+0@0@0   A-.----00010124 (initialize_debugger + 36) : retsp   i 0x00000004  L[0x0001fefc] @2617
