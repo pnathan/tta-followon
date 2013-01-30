@@ -62,6 +62,7 @@
 ;;Personal libraries.
 (asdf:load-system :batteries)
 (use-package :batteries)
+(ql:quickload :defobject)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Utils
@@ -78,7 +79,8 @@
 (defmacro *counter* ()
   (funcall *counter-closure*))
 
-
+(defun true-p (var)
+  (not (not var)))
 ;;; Logic
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,7 +120,7 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collection of the lexical instructions
-(batteries:defobject lexical-run (inst-list)
+(defobject:defobject lexical-run (inst-list)
   :documentation "Holds the information from the run; not wholly parsed. The
   inst-list is indeed an iterable")
 
@@ -132,7 +134,7 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The initial object created by the lexical pass
-(batteries:defobject lexical-instruction  (core
+(defobject:defobject lexical-instruction  (core
                                            thread
                                            pc
                                            op
@@ -196,22 +198,29 @@ instruction: returns a `lexical-instruction` object"
     run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject start-node ((core (make-array
-			      '(4)
-			      :initial-contents
-			      #(nil nil nil nil) )))
+;; Simulation superclass object
+(defobject:defobject comm-node (core operation out-data marked u-id next-inst next))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defobject:defobject start-node ((core (make-array
+					'(4)
+					:initial-contents
+					#(nil nil nil nil) )))
+  :superclasses '(comm-node)
+  :undecorated t
   :documentation "Start node for all operations; TOP in the lattice of
   communication")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject final-node ()
-  :documentation "Finalnode for all operations; the lattice of operations meets
-  here.")
+(defobject:defobject final-node ()
+  :undecorated t
+  :superclasses '(comm-node)
+  :documentation "Finalnode for all operations; the lattice of
+  operations meets here.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; A simulation object.
 ;;; This will get rendered out to the debug windows
-(batteries:defobject cpu-step (
+(defobject:defobject cpu-step (
 			       core    ;core
 			       thread  ;thread id
 			       opcode  ;asm op
@@ -242,7 +251,8 @@ instruction: returns a `lexical-instruction` object"
 					 ;instructions that the
 					 ;sequencing can point at.
 			       )
-
+  :undecorated t
+  :superclasses '(comm-node)
   :documentation "The context of a given CPU state at the end of an instruction
   on a given core/cpu. cpu-state denotes the set of user registers
   found at the end of the cycle; ie, those not the pc/lr/cp, etc")
@@ -257,36 +267,36 @@ instruction: returns a `lexical-instruction` object"
   ;; This can be done with a sufficiently smart macro. Which shall be
   ;; done when crunch is over.
   (let ((new (make-cpu-step)))
-    (setf (cpu-step-core new) (cpu-step-core obj))
-    (setf (cpu-step-thread new) (cpu-step-thread obj))
-    (setf (cpu-step-opcode new) (cpu-step-opcode obj))
-    (setf (cpu-step-cycle new) (cpu-step-cycle obj))
-    (setf (cpu-step-pc new) (cpu-step-pc obj))
-    (setf (cpu-step-lr new) (cpu-step-lr obj))
-    (setf (cpu-step-sp new) (cpu-step-sp obj))
-    (setf (cpu-step-cp new) (cpu-step-cp obj))
-    (setf (cpu-step-dp new) (cpu-step-dp obj))
-    (setf (cpu-step-res-id new) (cpu-step-res-id obj))
+    (setf (core new) (core obj))
+    (setf (thread new) (thread obj))
+    (setf (opcode new) (opcode obj))
+    (setf (cycle new) (cycle obj))
+    (setf (pc new) (pc obj))
+    (setf (lr new) (lr obj))
+    (setf (sp new) (sp obj))
+    (setf (cp new) (cp obj))
+    (setf (dp new) (dp obj))
+    (setf (res-id new) (res-id obj))
     ;; This may be a problem: reg is probably a reference
-    (setf (cpu-step-reg new) (cpu-step-reg obj))
-    (setf (cpu-step-out new) (cpu-step-out obj))
-    (setf (cpu-step-marked new) (cpu-step-marked obj))
-    (setf (cpu-step-u-id new) (cpu-step-u-id obj))
-    (setf (cpu-step-next-inst new) (cpu-step-next-inst obj))
-    (setf (cpu-step-next new) (cpu-step-next obj))
+    (setf (reg new) (reg obj))
+    (setf (out new) (out obj))
+    (setf (marked new) (marked obj))
+    (setf (u-id new) (u-id obj))
+    (setf (next-inst new) (next-inst obj))
+    (setf (next new) (next obj))
     new))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod modified-register ((obj cpu-step))
   "Returns the modified register for the operation"
   (position-if #'true-p
-	       (cpu-step-reg obj)))
+	       (reg obj)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod modified-value ((obj cpu-step))
   (let ((register (modified-register obj)))
     (if register
-	(elt (cpu-step-reg obj) register)
+	(elt (reg obj) register)
 	nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -492,15 +502,15 @@ Expects something of the form  *resource-parsing-string*
 	       (multiple-value-bind (reg value)
 		   (parse-dst-reg (first list))
 		 (cond ((< reg 12)
-			(setf (aref (cpu-step-reg register-state) reg) value))
+			(setf (aref (reg register-state) reg) value))
 		       ;;See Chapter 4 of the XS1 ISA reference.
 		       ;;Register 14 is an alias for the SP.
 		       ((eql reg 14)
-			(setf (cpu-step-sp register-state) value)))))
+			(setf (sp register-state) value)))))
 
 	     (assign-to-res-state (list)
 	       "Stores the resource id assigned in an OUT or a SET statement"
-	       (setf (cpu-step-res-id register-state)
+	       (setf (res-id register-state)
 		     (parse-resource-spec (first list)))))
 
       ;; This is very imperative case-based logic. There're probably
@@ -522,7 +532,7 @@ Expects something of the form  *resource-parsing-string*
 	 ;;get the assigned register
 	 (assign-to-reg-state list)
 	 ;;and the resource it came from
-	 (setf (cpu-step-res-id register-state)
+	 (setf (res-id register-state)
 	       (parse-resource-spec (second list))))
 
 
@@ -583,7 +593,7 @@ Expects something of the form  *resource-parsing-string*
 	    ((string= op "out")
 	     (multiple-value-bind (reg value)
 		 (parse-dst-reg (second list))
-	     (setf (cpu-step-out register-state)
+	     (setf (out register-state)
 		   value))))
 
 	  (if (not (string= op "set"))
@@ -603,7 +613,7 @@ Expects something of the form  *resource-parsing-string*
 	  (error "Operation not understood: ~a" op)))
 	;;end cond
 	;;set the operation
-	(setf (cpu-step-opcode register-state) op)
+	(setf (opcode register-state) op)
 	register-state)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -615,16 +625,16 @@ Expects something of the form  *resource-parsing-string*
 
     (let ((new-cpu-state (parse-instruction op reglist)))
 
-      (setf (cpu-step-pc new-cpu-state)
+      (setf (pc new-cpu-state)
 	    (lexical-instruction-pc obj))
 
-      (setf (cpu-step-cycle new-cpu-state)
+      (setf (cycle new-cpu-state)
 	    (parse-integer (lexical-instruction-cycle obj)))
 
-      (setf (cpu-step-thread new-cpu-state)
+      (setf (thread new-cpu-state)
 	    (parse-integer (lexical-instruction-thread obj)))
 
-      (setf (cpu-step-core new-cpu-state)
+      (setf (core new-cpu-state)
 	    (parse-integer (lexical-instruction-core obj)))
 
       new-cpu-state)))
@@ -633,21 +643,22 @@ Expects something of the form  *resource-parsing-string*
 ;; Semantic run.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defobject semantic-run ((container nil) sequence-cache)
-  :documentation "Contains a listof cpu-steps. Each cpu step has an id unique to the current run")
+  :documentation "Contains a listof cpu-steps. Each cpu step has an id
+  unique to the current run")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj semantic-run))
   (loop for step in (semantic-run-container obj)
        do
-	 (format t "~%** ~a--->~&" (cpu-step-u-id step))
+	 (format t "~%** ~a--->~&" (u-id step))
 	 (printme step)))
 
 (defmethod semantic-run-sort-container ((self semantic-run))
   "Sorts myself by the order laid out in the sequence"
   (let ((result (sort (semantic-run-container self)
 		      #'(lambda (x y)
-			  (< (cpu-step-u-id x)
-			     (cpu-step-u-id y))))))
+			  (< (u-id x)
+			     (u-id y))))))
     (setf (semantic-run-container self) result))
   self)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -701,33 +712,33 @@ Expects something of the form  *resource-parsing-string*
 	  str
 	  "~1,7T")))
 
-    (format t (t-a "~a") (cpu-step-u-id step))
-    (format t (t-a "~a") (cpu-step-opcode step))
+    (format t (t-a "~a") (u-id step))
+    (format t (t-a "~a") (opcode step))
     (format t (t-a "R V ~a") (register-modifications step))
 
     (if all
-	(format t (t-a "PC ~a") (cpu-step-pc step)))
+	(format t (t-a "PC ~a") (pc step)))
 
-    (format t (t-a "core ~a") (cpu-step-core step))
-    (format t (t-a "cycle ~a") (cpu-step-cycle step))
-    (if (cpu-step-out step)
-	(format t (t-a "out ~a") (cpu-step-out step)))
+    (format t (t-a "core ~a") (core step))
+    (format t (t-a "cycle ~a") (cycle step))
+    (if (out step)
+	(format t (t-a "out ~a") (out step)))
 
     (if res-info
-	(if (cpu-step-res-id step)
-	    (format t (t-a "res-id 0x~x") (cpu-step-res-id step))))
+	(if (res-id step)
+	    (format t (t-a "res-id 0x~x") (res-id step))))
 
-    (if (cpu-step-next-inst step)
+    (if (next-inst step)
 	(format t (t-a "|> ~a")
-		(loop for var in (cpu-step-next-inst step)
+		(loop for var in (next-inst step)
 		   collect
-		     (cpu-step-u-id var))))
-    (if (cpu-step-next step)
+		     (u-id var))))
+    (if (next step)
 	(format t (t-a "-> ~a")
-		(loop for var in (cpu-step-next step)
+		(loop for var in (next step)
 		   collect
 		     (if (eql (type-of var) 'CPU-STEP)
-		       (cpu-step-u-id var)
+		       (u-id var)
 		       'END-NODE))))
 
     (format t "~%")))
@@ -761,7 +772,7 @@ Expects something of the form  *resource-parsing-string*
        for id in (range-1 0 (length instruction-collection))
        for inst in parsed-inst-list
        do
-	 (setf (cpu-step-u-id inst) id)
+	 (setf (u-id inst) id)
 	 (semantic-run-append instruction-list inst))
     instruction-list))
 
@@ -776,21 +787,21 @@ Expects something of the form  *resource-parsing-string*
   ;;Consider caching.
   (sort
    (mapcar #'(lambda (step)
-	       (cpu-step-u-id step))
+	       (u-id step))
 	   (semantic-run-container self))
    '<))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-get-id ((self semantic-run) id)
   (find-if #'(lambda (step)
-	       (eql id (cpu-step-u-id step)))
+	       (eql id (u-id step)))
 	   (semantic-run-container self)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-delete-id ((self semantic-run) id)
   (setf (semantic-run-container self)
 	(remove-if #'(lambda (step)
-		       (eql id (cpu-step-u-id step)))
+		       (eql id (u-id step)))
 		   (semantic-run-container self)))
   self)
 
@@ -812,7 +823,7 @@ core"
      (remove-if-not
       #'(lambda (val)
 	  (eql
-	   (cpu-step-core val)
+	   (core val)
 	   core))
       (semantic-run-container obj)))
     filtered-run))
@@ -826,7 +837,7 @@ core"
      (remove-if
       #'(lambda (val)
 	  (eql
-	   (cpu-step-core val)
+	   (core val)
 	   core))
       (semantic-run-container object)))
     filtered-run))
@@ -849,7 +860,7 @@ core"
     (loop for var in seq
 	 until (string=
 		opcode
-		(cpu-step-opcode (semantic-run-get-id list var)))
+		(opcode (semantic-run-get-id list var)))
 	 finally (return (semantic-run-get-id list var)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -872,7 +883,7 @@ core"
      filtered-run
      (remove-if-not #'(lambda (val)
 			(find
-			 (cpu-step-opcode val)
+			 (opcode val)
 			 opcodes
 			 :test 'string= ))
 		    (semantic-run-container obj)))
@@ -911,14 +922,14 @@ core"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun is-outgoing (obj)
   (find
-   (cpu-step-opcode obj)
+   (opcode obj)
    *outgoing-ops*
    :test 'string=))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun is-incoming (obj)
   (find
-   (cpu-step-opcode obj)
+   (opcode obj)
    *incoming-ops*
    :test 'string=))
 
@@ -1058,14 +1069,14 @@ bits have the following meaning: ... .
   "Render a text description of the cpu-step"
     (format nil
 	    "core: ~a pc: ~a op: ~a : ~a on q ~a"
-	    (cpu-step-core data)
-	    (cpu-step-pc data)
-	    (cpu-step-opcode data)
+	    (core data)
+	    (pc data)
+	    (opcode data)
 	    (cond ((is-incoming data)
 		   (register-modifications data))
 		  ((is-outgoing data)
 
-		   (cpu-step-out data)))
+		   (out data)))
 	    (channel-of-comms data)
 	    ))
 
@@ -1090,10 +1101,10 @@ single core."
 
       (loop for pair in paired-node-list do
 	   ;;Set the first of the pairs
-	   (setf (cpu-step-next-inst (first pair))
+	   (setf (next-inst (first pair))
 		 (adjoin
 		  (second pair)
-		  (cpu-step-next-inst (first pair))))))
+		  (next-inst (first pair))))))
   visible-list)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1981,4 +1992,3 @@ list ::= ( start-node cpu-step* final-node)
 
 
 ;(generate-consolidated-graph *trace* *objdump* "/path/to/a/pngfile.png")
-
