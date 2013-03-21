@@ -53,6 +53,8 @@
 (ql:quickload :cl-ppcre)
 (ql:quickload :alexandria)
 (ql:quickload :cl-dot)
+(ql:quickload :metabang-bind)
+(use-package :metabang-bind)
 
 ;;Sets the path to dot correct for the standard install of Graphbiz on
 ;;OSX
@@ -63,6 +65,7 @@
 (asdf:load-system :batteries)
 (use-package :batteries)
 (ql:quickload :defobject)
+(use-package :defobject)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Utils
@@ -120,7 +123,7 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collection of the lexical instructions
-(defobject:defobject lexical-run (inst-list)
+(defobject lexical-run (inst-list)
   :documentation "Holds the information from the run; not wholly parsed. The
   inst-list is indeed an iterable")
 
@@ -134,12 +137,12 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The initial object created by the lexical pass
-(defobject:defobject lexical-instruction  (core
-                                           thread
-                                           pc
-                                           op
-                                           reginfo
-                                           cycle)
+(defobject lexical-instruction  (core
+                                 thread
+                                 pc
+                                 op
+                                 reginfo
+                                 cycle)
   :documentation "This is a given instruction's execution in the lexical environment")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -199,9 +202,9 @@ instruction: returns a `lexical-instruction` object"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simulation superclass object
-(defobject:defobject comm-node (core operation out-data marked u-id next-inst next))
+(defobject comm-node (core operation out-data marked u-id next-inst next))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject:defobject start-node ((core (make-array
+(defobject start-node ((core (make-array
 					'(4)
 					:initial-contents
 					#(nil nil nil nil) )))
@@ -211,7 +214,7 @@ instruction: returns a `lexical-instruction` object"
   communication")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject:defobject final-node ()
+(defobject final-node ()
   :undecorated t
   :superclasses '(comm-node)
   :documentation "Finalnode for all operations; the lattice of
@@ -220,7 +223,7 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; A simulation object.
 ;;; This will get rendered out to the debug windows
-(defobject:defobject cpu-step (
+(defobject cpu-step (
 			       core    ;core
 			       thread  ;thread id
 			       opcode  ;asm op
@@ -260,6 +263,8 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj cpu-step))
     (print-hash-table-1 (object-to-hash obj)))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod clone ((obj cpu-step))
@@ -642,37 +647,78 @@ Expects something of the form  *resource-parsing-string*
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic run.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject semantic-run ((container nil) sequence-cache)
-  :documentation "Contains a listof cpu-steps. Each cpu step has an id
-  unique to the current run")
+(defobject semantic-run ((container nil)
+                         sequence-cache)
+  :documentation "An object that handles semantic analysis"
+  :undecorated t)
+
+(defobject semantic-xcore-run ((container nil) sequence-cache)
+  :documentation "Contains a list of cpu-steps. Each cpu step has an id
+  unique to the current run"
+  :superclasses '(semantic-run)
+  :undecorated t)
+
+(defobject semantic-sexpr-run ((container nil) sequence-cache)
+  :documentation "Contains a list of sexpr-based ops"
+  :superclasses '(semantic-run)
+  :undecorated t)
+
+(defun load-sexp-file (filename)
+  (read-from-string
+   (batteries:read-text-file filename)))
+
+
+(defobject sexpr-step (core-id src dst core-op op-id)
+  :documentation "One step from the sexpr codes"
+  :undecorated t)
+
+(defmethod u-id ((obj sexpr-step))
+  (op-id obj))
+
+(defun parse-sexpr (form)
+  (bind (((core src _ dst op-id direction) form))
+    (make-sexpr-step :core-id core
+                     :src src
+                     :dst dst
+                     :op-id op-id
+                     :core-op (cond ((eq direction 'tx) :tx)
+                                    ((eq direction 'rx) :rx)
+                                    (t
+                                     (assert "Unable to grasp the direction"))))))
+
+(defun parse-sexpr-file (data)
+
+  (make-semantic-sexpr-run
+   :container  (mapcar #'parse-sexpr
+                       (loop for d in data
+                             append d))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj semantic-run))
-  (loop for step in (semantic-run-container obj)
+  (loop for step in (container obj)
        do
 	 (format t "~%** ~a--->~&" (u-id step))
 	 (printme step)))
 
 (defmethod semantic-run-sort-container ((self semantic-run))
   "Sorts myself by the order laid out in the sequence"
-  (let ((result (sort (semantic-run-container self)
+  (let ((result (sort (container self)
 		      #'(lambda (x y)
 			  (< (u-id x)
 			     (u-id y))))))
-    (setf (semantic-run-container self) result))
+    (setf (container self) result))
   self)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun semantic-run-append (self element)
+(defmethod semantic-run-append ((self semantic-run) element)
   "Appends `element` to `self`"
-  (push  element (semantic-run-container self) )
+  (push element (container self) )
   (semantic-run-sort-container self)
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-set-container((self semantic-run) (container list))
   "Setter"
-  (setf (semantic-run-container self) container)
-  ;(semantic-run-sort-container self)
+  (setf (container self) container)
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -680,7 +726,7 @@ Expects something of the form  *resource-parsing-string*
   (let ((new-run (make-semantic-run)))
     (semantic-run-set-container
      new-run
-     (loop for var in (semantic-run-container self)
+     (loop for var in (container self)
 	collect
 	  (clone var)))
     new-run))
@@ -695,68 +741,10 @@ Expects something of the form  *resource-parsing-string*
 (defmethod merge-semantic-runs (&rest objlist)
   (let ((newrun (make-semantic-run))
 	(step-list (flatten (remove-if 'not (loop for obj in objlist
-					       collect (semantic-run-container obj))))))
+					       collect (container obj))))))
     (semantic-run-set-container
      newrun
      step-list)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((step cpu-step) &key (all nil) (res-info nil))
-
-  (labels
-      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((t-a (str)
-	 "Tab append. For setting the pretty-print stuff"
-	 (concatenate
-	  'string
-	  str
-	  "~1,7T")))
-
-    (format t (t-a "~a") (u-id step))
-    (format t (t-a "~a") (opcode step))
-    (format t (t-a "R V ~a") (register-modifications step))
-
-    (if all
-	(format t (t-a "PC ~a") (pc step)))
-
-    (format t (t-a "core ~a") (core step))
-    (format t (t-a "cycle ~a") (cycle step))
-    (if (out step)
-	(format t (t-a "out ~a") (out step)))
-
-    (if res-info
-	(if (res-id step)
-	    (format t (t-a "res-id 0x~x") (res-id step))))
-
-    (if (next-inst step)
-	(format t (t-a "|> ~a")
-		(loop for var in (next-inst step)
-		   collect
-		     (u-id var))))
-    (if (next step)
-	(format t (t-a "-> ~a")
-		(loop for var in (next step)
-		   collect
-		     (if (eql (type-of var) 'CPU-STEP)
-		       (u-id var)
-		       'END-NODE))))
-
-    (format t "~%")))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj final-node) &key)
-  (format t "end~%"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj start-node) &key)
-  (format t "start~%"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj semantic-run) &key (all nil) (res-info nil))
-  (loop for id in (semantic-run-sequence obj)
-     do
-       (let ((step (semantic-run-get-id obj id)))
-	 (clean-print step :all all :res-info res-info))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-parse-run ((obj lexical-run))
@@ -779,7 +767,7 @@ Expects something of the form  *resource-parsing-string*
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-count ((self semantic-run))
   "Returns the number of steps contained in this object"
-  (list-length (semantic-run-container self)))
+  (list-length (container self)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-sequence ((self semantic-run))
@@ -788,21 +776,21 @@ Expects something of the form  *resource-parsing-string*
   (sort
    (mapcar #'(lambda (step)
 	       (u-id step))
-	   (semantic-run-container self))
+	   (container self))
    '<))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-get-id ((self semantic-run) id)
   (find-if #'(lambda (step)
 	       (eql id (u-id step)))
-	   (semantic-run-container self)))
+	   (container self)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-delete-id ((self semantic-run) id)
-  (setf (semantic-run-container self)
+  (setf (container self)
 	(remove-if #'(lambda (step)
 		       (eql id (u-id step)))
-		   (semantic-run-container self)))
+		   (container self)))
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -825,7 +813,7 @@ core"
 	  (eql
 	   (core val)
 	   core))
-      (semantic-run-container obj)))
+      (container obj)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -839,7 +827,7 @@ core"
 	  (eql
 	   (core val)
 	   core))
-      (semantic-run-container object)))
+      (container object)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -871,7 +859,8 @@ core"
     (read-sim-file filename))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defgeneric find-opcodes (obj opcodes))	;Probably usable on a lexical-run as well
+;; Probably usable on a lexical-run as well
+(defgeneric find-opcodes (obj opcodes))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod find-opcodes ((obj semantic-run) opcodes)
@@ -885,8 +874,8 @@ core"
 			(find
 			 (opcode val)
 			 opcodes
-			 :test 'string= ))
-		    (semantic-run-container obj)))
+			 :test 'string=))
+		    (container obj)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -950,82 +939,6 @@ core"
      (semantic-run-delete-multiple-ids
       obj
       (every-other (semantic-run-sequence (filter-for-incoming obj)))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; This will be used if we need to start doing some semantic analysis
-;; of the instruction stream to filter out ins/outs on bad channels.
-(defun parse-getr-returncode (inputcode retcode)
-  "GETR generates a return code that drops into its return register.
-
-Said return code encodes a set of meanings, depending on the input code.
-
-TODO: figure out how to encode variadic returns...
-"
-  (let ((requested-type
-	 (case inputcode
-	   (0 'port)
-	   (1 'timer)
-	   (2 'channel-end)
-	   (3 'synchroniser)
-	   (4 'thread)
-	   (5 'lock)
-	   (6 'clock-source)
-	   (11 'processor-state)
-	   (12 'configuration-message)
-	   (otherwise (error "Unable to understand input code: ~a" inputcode)))))
-
-    ;;; Now parse the input type
-    ;; snip from the manual
-    " The returned identifier comprises a 32-bit word, where the most
-significant 16-bits are resource specific data, followed by an 8-bit
-resource counter, and 8-bits resource-type. The resource specific 16
-bits have the following meaning: ... .
-"
-    (when (eql retcode 0)
-	(error "No resource available for request"))
-
-    ;;Bitmasking.
-    ;; Possibility of making a nifty bitmask function...
-    ;; (bitmask data mask mask-width) : this would be confusing.
-    (let ((resource-specific
-	   (ash (logand retcode #xFFFF0000) -16))
-	  (resource-counter
-	   (ash (logand retcode #x0000FF00) -8))
-	  (resource-type
-	   (ash (logand retcode #x000000FF) 0)))
-
-      (assert (eql inputcode resource-type))
-
-      (cond
-	((eql requested-type 'port)
-	 ;;width of the port
-	 resource-specific)
-	((eql requested-type 'channel-end)
-	 ;;node id, 8 bits, core id, 8 bits
-	 ;;assumption of concatenation
-	 (let ((node-id
-		 (ash (logand resource-specific #xFF) -8))
-		(core-id
-		 (ash (logand resource-specific #xFF) 0)))
-
-	    (error "This function not used yet")))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun parse-resource-id (res-id)
-  "Takes `res-id`, as used by an in|out instruction
-
-8 bits for each of these.
-
-| node-id | core-id |  resource-counter | resource-type |"
-  (let ((node-id          (ash (logand res-id #xFF000000) -24))
-	(core-id          (ash (logand res-id #x00FF0000) -16))
-	(resource-counter (ash (logand res-id #x0000FF00) -8))
-	(resource-type    (ash (logand res-id #x000000FF) -0)))
-    ;;sets up an a-list
-    (pairlis
-     '(node-id core-id resource-counter resource-type)
-     (list node-id core-id resource-counter resource-type))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; graph reading layer
 ;
@@ -1111,13 +1024,13 @@ single core."
 (defun connect-cpu-steps-by-core (run)
   (loop for core in (list-of-cores-in-run run)
      do
-       (connect-cpu-steps (semantic-run-container (filter-by-core run core)))))
+       (connect-cpu-steps (container (filter-by-core run core)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod pre-render-semantic-run ((object semantic-run))
   "Loads the sequence of a `semantic-run` and returns a list of
 `cpu-step`s"
-  (connect-cpu-steps (semantic-run-container object)))
+  (connect-cpu-steps (container object)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-node ((object cpu-step))
@@ -1527,7 +1440,7 @@ communications. That is, the IN-residuals."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod list-of-cores-in-run ((obj semantic-run))
   "Gives the list of the cores in the run"
-  (uniqueize (loop for step in (semantic-run-container obj)
+  (uniqueize (loop for step in (container obj)
 		collect
 		  (cpu-step-core step))))
 
@@ -1837,7 +1750,7 @@ Returns the starting node to send to the rendering routines"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod reset-linearization ((obj semantic-run))
   "Sets all the links for the non-instruction paths to nil"
-  (loop for var in (semantic-run-container obj)
+  (loop for var in (container obj)
      do
        (setf (cpu-step-next var) nil)))
 
@@ -1992,3 +1905,67 @@ list ::= ( start-node cpu-step* final-node)
 
 
 ;(generate-consolidated-graph *trace* *objdump* "/path/to/a/pngfile.png")
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; helper functions for repl development
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((step cpu-step) &key (all nil) (res-info nil))
+
+  (labels
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ((t-a (str)
+	 "Tab append. For setting the pretty-print stuff"
+	 (concatenate
+	  'string
+	  str
+	  "~1,7T")))
+
+    (format t (t-a "~a") (u-id step))
+    (format t (t-a "~a") (opcode step))
+    (format t (t-a "R V ~a") (register-modifications step))
+
+    (if all
+	(format t (t-a "PC ~a") (pc step)))
+
+    (format t (t-a "core ~a") (core step))
+    (format t (t-a "cycle ~a") (cycle step))
+    (if (out step)
+	(format t (t-a "out ~a") (out step)))
+
+    (if res-info
+	(if (res-id step)
+	    (format t (t-a "res-id 0x~x") (res-id step))))
+
+    (if (next-inst step)
+	(format t (t-a "|> ~a")
+		(loop for var in (next-inst step)
+		   collect
+		     (u-id var))))
+    (if (next step)
+	(format t (t-a "-> ~a")
+		(loop for var in (next step)
+		   collect
+		     (if (eql (type-of var) 'CPU-STEP)
+		       (u-id var)
+		       'END-NODE))))
+
+    (format t "~%")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj final-node) &key)
+  (format t "end~%"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj start-node) &key)
+  (format t "start~%"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj semantic-run) &key (all nil) (res-info nil))
+  (loop for id in (semantic-run-sequence obj)
+     do
+       (let ((step (semantic-run-get-id obj id)))
+	 (clean-print step :all all :res-info res-info))))
