@@ -413,6 +413,7 @@ writing to a file."
         collect
         (loop for comm in  (gethash id history)
               collect
+	     ;; ID
               (list id  (second comm) (fourth comm) (third comm) ))))
 
 

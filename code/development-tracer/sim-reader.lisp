@@ -199,7 +199,15 @@ instruction: returns a `lexical-instruction` object"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simulation superclass object
-(defobject:defobject comm-node (core operation out-data marked u-id next-inst next))
+(defobject:defobject comm-node
+    (core
+     operation
+     out-data
+     marked
+     u-id
+     next-inst
+     next))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defobject:defobject start-node ((core (make-array
 					'(4)
@@ -869,6 +877,14 @@ core"
   (semantic-parse-run
    (lexically-parse-sim
     (read-sim-file filename))))
+
+(defun read-ifc-file (filename)
+  (read-from-string
+   (alexandria:read-file-into-string filename)))
+
+(defun load-ifc-file (filename)
+  "Loads a file in the standard TTA trace format"
+  (read-ifc-file filename))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric find-opcodes (obj opcodes))	;Probably usable on a lexical-run as well
