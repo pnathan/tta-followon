@@ -670,6 +670,9 @@ Expects something of the form  *resource-parsing-string*
 (defmethod u-id ((obj sexpr-step))
   (op-id obj))
 
+(defmethod opcode ((obj sexpr-step))
+  (core-op obj))
+
 (defun parse-sexpr (form)
   (bind (((core src _ dst op-id direction) form))
     (make-sexpr-step :core-id core
@@ -894,8 +897,8 @@ core"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; These are the instructions of interest here.
-(defparameter *incoming-ops* '("in" "int"))
-(defparameter *outgoing-ops* '("out" "outt"))
+(defparameter *incoming-ops* '("in" "int" :rx))
+(defparameter *outgoing-ops* '("out" "outt" :tx))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod filter-for-incoming ((obj semantic-run))
