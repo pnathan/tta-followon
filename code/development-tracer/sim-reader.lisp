@@ -50,10 +50,12 @@
 (in-package :sim-reader)
 
 ;;regex lib
-(ql:quickload :cl-ppcre)
-(ql:quickload :alexandria)
-(ql:quickload :cl-dot)
-(ql:quickload :metabang-bind)
+(ql:quickload '(:cl-ppcre
+                :alexandria
+                :cl-dot
+                :metabang-bind))
+
+
 (use-package :metabang-bind)
 
 ;;Sets the path to dot correct for the standard install of Graphbiz on
@@ -91,6 +93,9 @@
  (:documentation
   "PRINTME is the standard debugging routine used here for the
   objects"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; XCORE simulation parsing.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-sim-file (filename)
@@ -651,6 +656,30 @@ Expects something of the form  *resource-parsing-string*
             (parse-integer (lexical-instruction-core obj)))
 
       new-cpu-state)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Generalized interface
+
+(defun load-ifc-file (filename)
+  (read-from-string
+   (batteries:read-text-file filename)))
+
+(defobject sexpr-step (core-id src dst core-op op-id)
+  :documentation "One step from the sexpr codes"
+  :undecorated t)
+
+(defmethod u-id ((obj sexpr-step))
+  (op-id obj))
+
+(defun parse-sexpr (form)
+  (bind (((core src _ dst op-id direction) form))
+    (make-sexpr-step :core-id core
+                     :src src
+                     :dst dst
+                     :op-id op-id
+                     :core-op (cond ((eq direction 'tx) :tx)
+                                    ((eq direction 'rx) :rx)
+                                    (t
+                                     (assert "Unable to grasp the direction"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic run.
@@ -671,35 +700,12 @@ Expects something of the form  *resource-parsing-string*
   :superclasses '(semantic-run)
   :undecorated t)
 
-(defun load-sexp-file (filename)
-  (read-from-string
-   (batteries:read-text-file filename)))
-
-
-(defobject sexpr-step (core-id src dst core-op op-id)
-  :documentation "One step from the sexpr codes"
-  :undecorated t)
-
-(defmethod u-id ((obj sexpr-step))
-  (op-id obj))
-
-(defun parse-sexpr (form)
-  (bind (((core src _ dst op-id direction) form))
-    (make-sexpr-step :core-id core
-                     :src src
-                     :dst dst
-                     :op-id op-id
-                     :core-op (cond ((eq direction 'tx) :tx)
-                                    ((eq direction 'rx) :rx)
-                                    (t
-                                     (assert "Unable to grasp the direction"))))))
-
 (defun parse-sexpr-file (data)
-
   (make-semantic-sexpr-run
    :container  (mapcar #'parse-sexpr
                        (loop for d in data
                              append d))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj semantic-run))
@@ -865,14 +871,6 @@ core"
   (semantic-parse-run
    (lexically-parse-sim
     (read-sim-file filename))))
-
-(defun read-ifc-file (filename)
-  (read-from-string
-   (alexandria:read-file-into-string filename)))
-
-(defun load-ifc-file (filename)
-  "Loads a file in the standard TTA trace format"
-  (read-ifc-file filename))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Probably usable on a lexical-run as well
