@@ -53,6 +53,8 @@
 (ql:quickload :cl-ppcre)
 (ql:quickload :alexandria)
 (ql:quickload :cl-dot)
+(ql:quickload :metabang-bind)
+(use-package :metabang-bind)
 
 ;;Sets the path to dot correct for the standard install of Graphbiz on
 ;;OSX
@@ -63,6 +65,7 @@
 (asdf:load-system :batteries)
 (use-package :batteries)
 (ql:quickload :defobject)
+(use-package :defobject)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Utils
@@ -120,7 +123,7 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Collection of the lexical instructions
-(defobject:defobject lexical-run (inst-list)
+(defobject lexical-run (inst-list)
   :documentation "Holds the information from the run; not wholly parsed. The
   inst-list is indeed an iterable")
 
@@ -134,12 +137,12 @@ Event caused | DBG_INT
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The initial object created by the lexical pass
-(defobject:defobject lexical-instruction  (core
-                                           thread
-                                           pc
-                                           op
-                                           reginfo
-                                           cycle)
+(defobject lexical-instruction  (core
+                                 thread
+                                 pc
+                                 op
+                                 reginfo
+                                 cycle)
   :documentation "This is a given instruction's execution in the lexical environment")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -151,29 +154,29 @@ Event caused | DBG_INT
   "Appends the instruction to the run.
 FIFO"
   (setf (lexical-run-inst-list container)
-	(append (lexical-run-inst-list container) (list instr))))
+        (append (lexical-run-inst-list container) (list instr))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun lex-instruction (sim-line)
   "Parses a line from the simulation and transforms it to an
 instruction: returns a `lexical-instruction` object"
   (let ((result
-	 (cl-ppcre:register-groups-bind
-	     ;(core thread)
-	     ;("stdcore\\[(\\d)\\]@(\\d)"
-	     (core thread  nil pc  op reginfo  cycle)
-	     ("stdcore\\[(\\d)\\]@(\\d)..+?(\.|-)+?([0-9A-Fa-f]{8}).+?:\\s(\\w+)\\s+(.*?)\\s+@(\\d+)"
-	      sim-line)
-	   (make-lexical-instruction
-	    :core core
-	    :thread thread
-	    :pc pc
-	    :reginfo reginfo
-	    :cycle cycle
-	    :op op))))
+         (cl-ppcre:register-groups-bind
+             ;(core thread)
+             ;("stdcore\\[(\\d)\\]@(\\d)"
+             (core thread  nil pc  op reginfo  cycle)
+             ("stdcore\\[(\\d)\\]@(\\d)..+?(\.|-)+?([0-9A-Fa-f]{8}).+?:\\s(\\w+)\\s+(.*?)\\s+@(\\d+)"
+              sim-line)
+           (make-lexical-instruction
+            :core core
+            :thread thread
+            :pc pc
+            :reginfo reginfo
+            :cycle cycle
+            :op op))))
     (if result
-	result
-	(error "Unable to lex: ~a" sim-line))))
+        result
+        (error "Unable to lex: ~a" sim-line))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -192,9 +195,9 @@ instruction: returns a `lexical-instruction` object"
   "Returns a run from the list of lines"
   (let ((run (make-lexical-run)))
     (loop for sim-line in list-of-lines do
-	 (store
-	  run
-	  (lex-instruction sim-line)))
+         (store
+          run
+          (lex-instruction sim-line)))
     run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -209,17 +212,17 @@ instruction: returns a `lexical-instruction` object"
      next))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject:defobject start-node ((core (make-array
-					'(4)
-					:initial-contents
-					#(nil nil nil nil) )))
+(defobject start-node ((core (make-array
+                                        '(4)
+                                        :initial-contents
+                                        #(nil nil nil nil) )))
   :superclasses '(comm-node)
   :undecorated t
   :documentation "Start node for all operations; TOP in the lattice of
   communication")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject:defobject final-node ()
+(defobject final-node ()
   :undecorated t
   :superclasses '(comm-node)
   :documentation "Finalnode for all operations; the lattice of
@@ -228,37 +231,37 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; A simulation object.
 ;;; This will get rendered out to the debug windows
-(defobject:defobject cpu-step (
-			       core    ;core
-			       thread  ;thread id
-			       opcode  ;asm op
-			       cycle   ;cycle (only relevant for sims)
-			       pc      ;program counter
-			       lr      ;link register
-			       sp      ;stack pointer
-			       cp      ;constant pointer
-			       dp      ;data pointer
-			       res-id  ;Resource id.
-			       (reg
-					;simply specifying #(...)
-					;yields the same referent in
-					;memory.
-				(make-array '(12)
-					    :initial-contents
-					    #(nil nil nil
-					      nil nil nil
-					      nil nil nil
-					      nil nil nil)))
-			       out	;Data being sent out
-			       marked	;Has this been marked
-			       u-id	;Used to id the step for this particular run.
+(defobject cpu-step (
+                               core    ;core
+                               thread  ;thread id
+                               opcode  ;asm op
+                               cycle   ;cycle (only relevant for sims)
+                               pc      ;program counter
+                               lr      ;link register
+                               sp      ;stack pointer
+                               cp      ;constant pointer
+                               dp      ;data pointer
+                               res-id  ;Resource id.
+                               (reg
+                                        ;simply specifying #(...)
+                                        ;yields the same referent in
+                                        ;memory.
+                                (make-array '(12)
+                                            :initial-contents
+                                            #(nil nil nil
+                                              nil nil nil
+                                              nil nil nil
+                                              nil nil nil)))
+                               out      ;Data being sent out
+                               marked   ;Has this been marked
+                               u-id     ;Used to id the step for this particular run.
 
-			       next-inst ;The next instruction this
-					 ;can points to
-			       next	 ;The set of other
-					 ;instructions that the
-					 ;sequencing can point at.
-			       )
+                               next-inst ;The next instruction this
+                                         ;can points to
+                               next      ;The set of other
+                                         ;instructions that the
+                                         ;sequencing can point at.
+                               )
   :undecorated t
   :superclasses '(comm-node)
   :documentation "The context of a given CPU state at the end of an instruction
@@ -268,6 +271,8 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj cpu-step))
     (print-hash-table-1 (object-to-hash obj)))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod clone ((obj cpu-step))
@@ -298,21 +303,21 @@ instruction: returns a `lexical-instruction` object"
 (defmethod modified-register ((obj cpu-step))
   "Returns the modified register for the operation"
   (position-if #'true-p
-	       (reg obj)))
+               (reg obj)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod modified-value ((obj cpu-step))
   (let ((register (modified-register obj)))
     (if register
-	(elt (reg obj) register)
-	nil)))
+        (elt (reg obj) register)
+        nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod register-modifications ((obj cpu-step))
   "Returns a list (register# value) of the registers modified by the
   operation"
   (list (modified-register obj)
-	(modified-value obj)))
+        (modified-value obj)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -457,14 +462,14 @@ Returns a (VALUES dst-register register-value).
 
 Both dst-register and register-value are a number"
   (let ((result (cl-ppcre:register-groups-bind
-		   (reg value)
-		   (*reg-parsing-string*
-		    regstring)
-		  (list reg value)
-		  )))
+                   (reg value)
+                   (*reg-parsing-string*
+                    regstring)
+                  (list reg value)
+                  )))
     (if result
-	(values (parse-integer (first result))
-	      (parse-integer (second result) :radix 16))
+        (values (parse-integer (first result))
+              (parse-integer (second result) :radix 16))
 
       (error "Unable to parse: ~a" regstring))))
 
@@ -485,16 +490,16 @@ Used for OUT or SET instructions
 Expects something of the form  *resource-parsing-string*
 "
   (let ((result
-	 (cl-ppcre:register-groups-bind
-	     (value)
-	     (*resource-parsing-string*
-	      regstring)
-	   value)))
+         (cl-ppcre:register-groups-bind
+             (value)
+             (*resource-parsing-string*
+              regstring)
+           value)))
 
     (if result
-	(parse-integer result :radix 16)
+        (parse-integer result :radix 16)
 
-	(error "Unable to parse: ~a" regstring))))
+        (error "Unable to parse: ~a" regstring))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun parse-instruction (op list)
@@ -506,181 +511,222 @@ Expects something of the form  *resource-parsing-string*
   (let ((register-state (make-cpu-step)))
 
     (labels ((assign-to-reg-state (list)
-	       "Used in storing the destination register to the register-state variable"
-	       (multiple-value-bind (reg value)
-		   (parse-dst-reg (first list))
-		 (cond ((< reg 12)
-			(setf (aref (reg register-state) reg) value))
-		       ;;See Chapter 4 of the XS1 ISA reference.
-		       ;;Register 14 is an alias for the SP.
-		       ((eql reg 14)
-			(setf (sp register-state) value)))))
+               "Used in storing the destination register to the register-state variable"
+               (multiple-value-bind (reg value)
+                   (parse-dst-reg (first list))
+                 (cond ((< reg 12)
+                        (setf (aref (reg register-state) reg) value))
+                       ;;See Chapter 4 of the XS1 ISA reference.
+                       ;;Register 14 is an alias for the SP.
+                       ((eql reg 14)
+                        (setf (sp register-state) value)))))
 
-	     (assign-to-res-state (list)
-	       "Stores the resource id assigned in an OUT or a SET statement"
-	       (setf (res-id register-state)
-		     (parse-resource-spec (first list)))))
+             (assign-to-res-state (list)
+               "Stores the resource id assigned in an OUT or a SET statement"
+               (setf (res-id register-state)
+                     (parse-resource-spec (first list)))))
 
       ;; This is very imperative case-based logic. There're probably
       ;; simplifications possible.
 
       (cond
-	((find op *register-register-register-register-instructions* :test 'string=)
-	 (assign-to-reg-state list))
-	((find op *register-register-register-offset* :test 'string=)
-	 ;;only a load right now
-	 (assign-to-reg-state list))
+        ((find op *register-register-register-register-instructions* :test 'string=)
+         (assign-to-reg-state list))
+        ((find op *register-register-register-offset* :test 'string=)
+         ;;only a load right now
+         (assign-to-reg-state list))
 
-	((find op *sliced-memory-instructions* :test 'string=)
-	 (if (string= op "ld16s")
-	     (assign-to-reg-state list)))
+        ((find op *sliced-memory-instructions* :test 'string=)
+         (if (string= op "ld16s")
+             (assign-to-reg-state list)))
 
-	((find op *register-resource-instructions* :test 'string=)
-	 ;;e.g., INCT
-	 ;;get the assigned register
-	 (assign-to-reg-state list)
-	 ;;and the resource it came from
-	 (setf (res-id register-state)
-	       (parse-resource-spec (second list))))
-
-
-	((find op *register-instructions* :test 'string=)
-	 ;;no value returned
-	 )
-	((find op *resource-instructions* :test 'string=)
-	 ;; no value returned
-	 )
-	((find op *no-arg-instructions* :test 'string=)
-	 ;;no value returned
-	 )
-	((find op *resource-immediate-instructions* :test 'string=)
-	 ;;no value returned
-	 )
-	((find op *thread-instructions* :test 'string=)
-	 ;;init not document in the ISA?!
-	 )
-
-	((find op *register-register-instructions* :test 'string=)
-	 ;;   r11(0x10444), r2(0x3)
-	 (assign-to-reg-state list))
-
-	((find op *register-register-immediate-instructions* :test 'string=)
-	 ;;
-	 (assign-to-reg-state list))
-
-	((find op *memory-instructions* :test 'string=)
-	 (if (string= op "ldw")
-	     (assign-to-reg-state list)))
-
-	 ((find op *sp-instructions* :test 'string=)
-	  ;;TODO: futz with sp/lr
-	  ;;sp-modifying instructions, possibl lr as well.
-	  )
-
-	 ((find op *register-immediate-instructions* :test 'string=)
-	  ;;("r1 0x0000000b" "i 0x0000000b")
-	  (assign-to-reg-state list))
-
-	 ((find op *get-instructions* :test 'string=)
-	  ;;r0 0x00010000 , ps[r1 0x0000000b ] @9
-	  (assign-to-reg-state list))
-
-	 ((find op *register-register-register-instructions* :test 'string=)
-	  ;;("r0 0x00020000" "r10 0x00010000" "r11 0x00010000")
-	  (assign-to-reg-state list))
-
-	 ((find op *resource-register-instructions* :test 'string=)
-	  ;;ps[r2 0x0000010b ], r0 0x00010000
-
-	  ;;Here we do not edit the state of the CPU proper, but instead
-	  ;;modify some output or jtag setting.
-
-	  ;;Set can do a lot of things. Right now we're not interested
-	  ;;in set. Just out & its kin.
-	  (cond
-	    ((string= op "out")
-	     (multiple-value-bind (reg value)
-		 (parse-dst-reg (second list))
-	     (setf (out register-state)
-		   value))))
-
-	  (if (not (string= op "set"))
-	      (assign-to-res-state list)))
-
-	 ((find op *immediate-instructions* :test 'string=)
-	  ;;bl      i 0x0000000f
-
-	  ;; These are branch instructions, which solely modify the
-	  ;; PC. The current PC is discovered from the sim line.
-
-	  ;;extsp is also in this group, it modifies the SP
-	  )
+        ((find op *register-resource-instructions* :test 'string=)
+         ;;e.g., INCT
+         ;;get the assigned register
+         (assign-to-reg-state list)
+         ;;and the resource it came from
+         (setf (res-id register-state)
+               (parse-resource-spec (second list))))
 
 
-	 (t
-	  (error "Operation not understood: ~a" op)))
-	;;end cond
-	;;set the operation
-	(setf (opcode register-state) op)
-	register-state)))
+        ((find op *register-instructions* :test 'string=)
+         ;;no value returned
+         )
+        ((find op *resource-instructions* :test 'string=)
+         ;; no value returned
+         )
+        ((find op *no-arg-instructions* :test 'string=)
+         ;;no value returned
+         )
+        ((find op *resource-immediate-instructions* :test 'string=)
+         ;;no value returned
+         )
+        ((find op *thread-instructions* :test 'string=)
+         ;;init not document in the ISA?!
+         )
+
+        ((find op *register-register-instructions* :test 'string=)
+         ;;   r11(0x10444), r2(0x3)
+         (assign-to-reg-state list))
+
+        ((find op *register-register-immediate-instructions* :test 'string=)
+         ;;
+         (assign-to-reg-state list))
+
+        ((find op *memory-instructions* :test 'string=)
+         (if (string= op "ldw")
+             (assign-to-reg-state list)))
+
+         ((find op *sp-instructions* :test 'string=)
+          ;;TODO: futz with sp/lr
+          ;;sp-modifying instructions, possibl lr as well.
+          )
+
+         ((find op *register-immediate-instructions* :test 'string=)
+          ;;("r1 0x0000000b" "i 0x0000000b")
+          (assign-to-reg-state list))
+
+         ((find op *get-instructions* :test 'string=)
+          ;;r0 0x00010000 , ps[r1 0x0000000b ] @9
+          (assign-to-reg-state list))
+
+         ((find op *register-register-register-instructions* :test 'string=)
+          ;;("r0 0x00020000" "r10 0x00010000" "r11 0x00010000")
+          (assign-to-reg-state list))
+
+         ((find op *resource-register-instructions* :test 'string=)
+          ;;ps[r2 0x0000010b ], r0 0x00010000
+
+          ;;Here we do not edit the state of the CPU proper, but instead
+          ;;modify some output or jtag setting.
+
+          ;;Set can do a lot of things. Right now we're not interested
+          ;;in set. Just out & its kin.
+          (cond
+            ((string= op "out")
+             (multiple-value-bind (reg value)
+                 (parse-dst-reg (second list))
+             (setf (out register-state)
+                   value))))
+
+          (if (not (string= op "set"))
+              (assign-to-res-state list)))
+
+         ((find op *immediate-instructions* :test 'string=)
+          ;;bl      i 0x0000000f
+
+          ;; These are branch instructions, which solely modify the
+          ;; PC. The current PC is discovered from the sim line.
+
+          ;;extsp is also in this group, it modifies the SP
+          )
+
+
+         (t
+          (error "Operation not understood: ~a" op)))
+        ;;end cond
+        ;;set the operation
+        (setf (opcode register-state) op)
+        register-state)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-parse-instruction ((obj lexical-instruction))
   "Takes a lexical instruction and returns a cpu-step"
 
   (let ((reglist (lex-registers obj))
-	(op (lexical-instruction-op obj)))
+        (op (lexical-instruction-op obj)))
 
     (let ((new-cpu-state (parse-instruction op reglist)))
 
       (setf (pc new-cpu-state)
-	    (lexical-instruction-pc obj))
+            (lexical-instruction-pc obj))
 
       (setf (cycle new-cpu-state)
-	    (parse-integer (lexical-instruction-cycle obj)))
+            (parse-integer (lexical-instruction-cycle obj)))
 
       (setf (thread new-cpu-state)
-	    (parse-integer (lexical-instruction-thread obj)))
+            (parse-integer (lexical-instruction-thread obj)))
 
       (setf (core new-cpu-state)
-	    (parse-integer (lexical-instruction-core obj)))
+            (parse-integer (lexical-instruction-core obj)))
 
       new-cpu-state)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic run.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defobject semantic-run ((container nil) sequence-cache)
-  :documentation "Contains a listof cpu-steps. Each cpu step has an id
-  unique to the current run")
+(defobject semantic-run ((container nil)
+                         sequence-cache)
+  :documentation "An object that handles semantic analysis"
+  :undecorated t)
+
+(defobject semantic-xcore-run ((container nil) sequence-cache)
+  :documentation "Contains a list of cpu-steps. Each cpu step has an id
+  unique to the current run"
+  :superclasses '(semantic-run)
+  :undecorated t)
+
+(defobject semantic-sexpr-run ((container nil) sequence-cache)
+  :documentation "Contains a list of sexpr-based ops"
+  :superclasses '(semantic-run)
+  :undecorated t)
+
+(defun load-sexp-file (filename)
+  (read-from-string
+   (batteries:read-text-file filename)))
+
+
+(defobject sexpr-step (core-id src dst core-op op-id)
+  :documentation "One step from the sexpr codes"
+  :undecorated t)
+
+(defmethod u-id ((obj sexpr-step))
+  (op-id obj))
+
+(defun parse-sexpr (form)
+  (bind (((core src _ dst op-id direction) form))
+    (make-sexpr-step :core-id core
+                     :src src
+                     :dst dst
+                     :op-id op-id
+                     :core-op (cond ((eq direction 'tx) :tx)
+                                    ((eq direction 'rx) :rx)
+                                    (t
+                                     (assert "Unable to grasp the direction"))))))
+
+(defun parse-sexpr-file (data)
+
+  (make-semantic-sexpr-run
+   :container  (mapcar #'parse-sexpr
+                       (loop for d in data
+                             append d))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj semantic-run))
-  (loop for step in (semantic-run-container obj)
+  (loop for step in (container obj)
        do
-	 (format t "~%** ~a--->~&" (u-id step))
-	 (printme step)))
+         (format t "~%** ~a--->~&" (u-id step))
+         (printme step)))
 
 (defmethod semantic-run-sort-container ((self semantic-run))
   "Sorts myself by the order laid out in the sequence"
-  (let ((result (sort (semantic-run-container self)
-		      #'(lambda (x y)
-			  (< (u-id x)
-			     (u-id y))))))
-    (setf (semantic-run-container self) result))
+  (let ((result (sort (container self)
+                      #'(lambda (x y)
+                          (< (u-id x)
+                             (u-id y))))))
+    (setf (container self) result))
   self)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun semantic-run-append (self element)
+(defmethod semantic-run-append ((self semantic-run) element)
   "Appends `element` to `self`"
-  (push  element (semantic-run-container self) )
+  (push element (container self) )
   (semantic-run-sort-container self)
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-set-container((self semantic-run) (container list))
   "Setter"
-  (setf (semantic-run-container self) container)
-  ;(semantic-run-sort-container self)
+  (setf (container self) container)
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -688,9 +734,9 @@ Expects something of the form  *resource-parsing-string*
   (let ((new-run (make-semantic-run)))
     (semantic-run-set-container
      new-run
-     (loop for var in (semantic-run-container self)
-	collect
-	  (clone var)))
+     (loop for var in (container self)
+        collect
+          (clone var)))
     new-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -702,92 +748,34 @@ Expects something of the form  *resource-parsing-string*
 ;; This allows a (loop collect) mechanism
 (defmethod merge-semantic-runs (&rest objlist)
   (let ((newrun (make-semantic-run))
-	(step-list (flatten (remove-if 'not (loop for obj in objlist
-					       collect (semantic-run-container obj))))))
+        (step-list (flatten (remove-if 'not (loop for obj in objlist
+                                               collect (container obj))))))
     (semantic-run-set-container
      newrun
      step-list)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((step cpu-step) &key (all nil) (res-info nil))
-
-  (labels
-      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      ((t-a (str)
-	 "Tab append. For setting the pretty-print stuff"
-	 (concatenate
-	  'string
-	  str
-	  "~1,7T")))
-
-    (format t (t-a "~a") (u-id step))
-    (format t (t-a "~a") (opcode step))
-    (format t (t-a "R V ~a") (register-modifications step))
-
-    (if all
-	(format t (t-a "PC ~a") (pc step)))
-
-    (format t (t-a "core ~a") (core step))
-    (format t (t-a "cycle ~a") (cycle step))
-    (if (out step)
-	(format t (t-a "out ~a") (out step)))
-
-    (if res-info
-	(if (res-id step)
-	    (format t (t-a "res-id 0x~x") (res-id step))))
-
-    (if (next-inst step)
-	(format t (t-a "|> ~a")
-		(loop for var in (next-inst step)
-		   collect
-		     (u-id var))))
-    (if (next step)
-	(format t (t-a "-> ~a")
-		(loop for var in (next step)
-		   collect
-		     (if (eql (type-of var) 'CPU-STEP)
-		       (u-id var)
-		       'END-NODE))))
-
-    (format t "~%")))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj final-node) &key)
-  (format t "end~%"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj start-node) &key)
-  (format t "start~%"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmethod clean-print ((obj semantic-run) &key (all nil) (res-info nil))
-  (loop for id in (semantic-run-sequence obj)
-     do
-       (let ((step (semantic-run-get-id obj id)))
-	 (clean-print step :all all :res-info res-info))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-parse-run ((obj lexical-run))
   "Parse a lexical run and return a semantic-run"
 
   (let* ((instruction-collection (lexical-run-inst-list obj))
-	 (parsed-inst-list (loop for step in instruction-collection
-		       collect
-			 (semantic-parse-instruction step)))
-	 (instruction-list (make-semantic-run)))
+         (parsed-inst-list (loop for step in instruction-collection
+                       collect
+                         (semantic-parse-instruction step)))
+         (instruction-list (make-semantic-run)))
     ;;Now assign each instruction to a given id, counting up from 0.
     (loop
        for id in (range-1 0 (length instruction-collection))
        for inst in parsed-inst-list
        do
-	 (setf (u-id inst) id)
-	 (semantic-run-append instruction-list inst))
+         (setf (u-id inst) id)
+         (semantic-run-append instruction-list inst))
     instruction-list))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-count ((self semantic-run))
   "Returns the number of steps contained in this object"
-  (list-length (semantic-run-container self)))
+  (list-length (container self)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-sequence ((self semantic-run))
@@ -795,22 +783,22 @@ Expects something of the form  *resource-parsing-string*
   ;;Consider caching.
   (sort
    (mapcar #'(lambda (step)
-	       (u-id step))
-	   (semantic-run-container self))
+               (u-id step))
+           (container self))
    '<))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-get-id ((self semantic-run) id)
   (find-if #'(lambda (step)
-	       (eql id (u-id step)))
-	   (semantic-run-container self)))
+               (eql id (u-id step)))
+           (container self)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-run-delete-id ((self semantic-run) id)
-  (setf (semantic-run-container self)
-	(remove-if #'(lambda (step)
-		       (eql id (u-id step)))
-		   (semantic-run-container self)))
+  (setf (container self)
+        (remove-if #'(lambda (step)
+                       (eql id (u-id step)))
+                   (container self)))
   self)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -830,10 +818,10 @@ core"
      filtered-run
      (remove-if-not
       #'(lambda (val)
-	  (eql
-	   (core val)
-	   core))
-      (semantic-run-container obj)))
+          (eql
+           (core val)
+           core))
+      (container obj)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -844,10 +832,10 @@ core"
      filtered-run
      (remove-if
       #'(lambda (val)
-	  (eql
-	   (core val)
-	   core))
-      (semantic-run-container object)))
+          (eql
+           (core val)
+           core))
+      (container object)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -858,18 +846,18 @@ core"
 (defmethod find-first-inst-of-type (inst-string (list lexical-run))
   (elt (lexical-run-inst-list list)
        (position-if
-	#'(lambda (inst)
-	    (string= (lexical-instruction-op inst) inst-string))
-	(lexical-run-inst-list list))))
+        #'(lambda (inst)
+            (string= (lexical-instruction-op inst) inst-string))
+        (lexical-run-inst-list list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod find-first-inst-of-type (opcode (list semantic-run))
   (let ((seq (semantic-run-sequence list)))
     (loop for var in seq
-	 until (string=
-		opcode
-		(opcode (semantic-run-get-id list var)))
-	 finally (return (semantic-run-get-id list var)))))
+         until (string=
+                opcode
+                (opcode (semantic-run-get-id list var)))
+         finally (return (semantic-run-get-id list var)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun load-a-sim-file (filename)
@@ -887,7 +875,8 @@ core"
   (read-ifc-file filename))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defgeneric find-opcodes (obj opcodes))	;Probably usable on a lexical-run as well
+;; Probably usable on a lexical-run as well
+(defgeneric find-opcodes (obj opcodes))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod find-opcodes ((obj semantic-run) opcodes)
@@ -898,11 +887,11 @@ core"
     (semantic-run-set-container
      filtered-run
      (remove-if-not #'(lambda (val)
-			(find
-			 (opcode val)
-			 opcodes
-			 :test 'string= ))
-		    (semantic-run-container obj)))
+                        (find
+                         (opcode val)
+                         opcodes
+                         :test 'string=))
+                    (container obj)))
     filtered-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -960,88 +949,12 @@ core"
       (semantic-run-delete-id
        obj
        (first
-	(semantic-run-sequence (filter-for-incoming obj)))))
+        (semantic-run-sequence (filter-for-incoming obj)))))
     (t
      ;;A non-transaction has every other
      (semantic-run-delete-multiple-ids
       obj
       (every-other (semantic-run-sequence (filter-for-incoming obj)))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; This will be used if we need to start doing some semantic analysis
-;; of the instruction stream to filter out ins/outs on bad channels.
-(defun parse-getr-returncode (inputcode retcode)
-  "GETR generates a return code that drops into its return register.
-
-Said return code encodes a set of meanings, depending on the input code.
-
-TODO: figure out how to encode variadic returns...
-"
-  (let ((requested-type
-	 (case inputcode
-	   (0 'port)
-	   (1 'timer)
-	   (2 'channel-end)
-	   (3 'synchroniser)
-	   (4 'thread)
-	   (5 'lock)
-	   (6 'clock-source)
-	   (11 'processor-state)
-	   (12 'configuration-message)
-	   (otherwise (error "Unable to understand input code: ~a" inputcode)))))
-
-    ;;; Now parse the input type
-    ;; snip from the manual
-    " The returned identifier comprises a 32-bit word, where the most
-significant 16-bits are resource specific data, followed by an 8-bit
-resource counter, and 8-bits resource-type. The resource specific 16
-bits have the following meaning: ... .
-"
-    (when (eql retcode 0)
-	(error "No resource available for request"))
-
-    ;;Bitmasking.
-    ;; Possibility of making a nifty bitmask function...
-    ;; (bitmask data mask mask-width) : this would be confusing.
-    (let ((resource-specific
-	   (ash (logand retcode #xFFFF0000) -16))
-	  (resource-counter
-	   (ash (logand retcode #x0000FF00) -8))
-	  (resource-type
-	   (ash (logand retcode #x000000FF) 0)))
-
-      (assert (eql inputcode resource-type))
-
-      (cond
-	((eql requested-type 'port)
-	 ;;width of the port
-	 resource-specific)
-	((eql requested-type 'channel-end)
-	 ;;node id, 8 bits, core id, 8 bits
-	 ;;assumption of concatenation
-	 (let ((node-id
-		 (ash (logand resource-specific #xFF) -8))
-		(core-id
-		 (ash (logand resource-specific #xFF) 0)))
-
-	    (error "This function not used yet")))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun parse-resource-id (res-id)
-  "Takes `res-id`, as used by an in|out instruction
-
-8 bits for each of these.
-
-| node-id | core-id |  resource-counter | resource-type |"
-  (let ((node-id          (ash (logand res-id #xFF000000) -24))
-	(core-id          (ash (logand res-id #x00FF0000) -16))
-	(resource-counter (ash (logand res-id #x0000FF00) -8))
-	(resource-type    (ash (logand res-id #x000000FF) -0)))
-    ;;sets up an a-list
-    (pairlis
-     '(node-id core-id resource-counter resource-type)
-     (list node-id core-id resource-counter resource-type))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; graph reading layer
 ;
@@ -1066,7 +979,7 @@ bits have the following meaning: ... .
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defvar *channel-existence-id* 0)	;this could be anything
+(defvar *channel-existence-id* 0)       ;this could be anything
 (defun get-new-channel-id ()
   (setf *channel-existence-id* (1+  *channel-existence-id*)))
 
@@ -1084,17 +997,17 @@ bits have the following meaning: ... .
 (defmethod render-label ((data cpu-step))
   "Render a text description of the cpu-step"
     (format nil
-	    "core: ~a pc: ~a op: ~a : ~a on q ~a"
-	    (core data)
-	    (pc data)
-	    (opcode data)
-	    (cond ((is-incoming data)
-		   (register-modifications data))
-		  ((is-outgoing data)
+            "core: ~a pc: ~a op: ~a : ~a on q ~a"
+            (core data)
+            (pc data)
+            (opcode data)
+            (cond ((is-incoming data)
+                   (register-modifications data))
+                  ((is-outgoing data)
 
-		   (out data)))
-	    (channel-of-comms data)
-	    ))
+                   (out data)))
+            (channel-of-comms data)
+            ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod render-label ((object list))
@@ -1110,37 +1023,37 @@ single core."
 
   ;; This pairs up cpu-steps
   (let ((paired-node-list
-	   (batteries:gather-generator
-	    visible-list
-	    'batteries:sliding-window-2-wide
-	    'batteries:sliding-chunker)))
+           (batteries:gather-generator
+            visible-list
+            'batteries:sliding-window-2-wide
+            'batteries:sliding-chunker)))
 
       (loop for pair in paired-node-list do
-	   ;;Set the first of the pairs
-	   (setf (next-inst (first pair))
-		 (adjoin
-		  (second pair)
-		  (next-inst (first pair))))))
+           ;;Set the first of the pairs
+           (setf (next-inst (first pair))
+                 (adjoin
+                  (second pair)
+                  (next-inst (first pair))))))
   visible-list)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun connect-cpu-steps-by-core (run)
   (loop for core in (list-of-cores-in-run run)
      do
-       (connect-cpu-steps (semantic-run-container (filter-by-core run core)))))
+       (connect-cpu-steps (container (filter-by-core run core)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod pre-render-semantic-run ((object semantic-run))
   "Loads the sequence of a `semantic-run` and returns a list of
 `cpu-step`s"
-  (connect-cpu-steps (semantic-run-container object)))
+  (connect-cpu-steps (container object)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-node ((object cpu-step))
   (make-instance 'cl-dot:node
-		 :attributes (list
-			      :label (render-label object)
-			      :shape :box)))
+                 :attributes (list
+                              :label (render-label object)
+                              :shape :box)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-points-to ((object cpu-step))
@@ -1148,16 +1061,16 @@ single core."
   (append
    (if (cpu-step-next-inst object)
        (loop for ptr in (cpu-step-next-inst object)
-	  collect
-	    (make-instance 'cl-dot:attributed
-			   :object  ptr
-			   :attributes '(:weight 3))))
+          collect
+            (make-instance 'cl-dot:attributed
+                           :object  ptr
+                           :attributes '(:weight 3))))
    (if (cpu-step-next object)
        (loop for ptr in (cpu-step-next object)
-	  collect
-	    (make-instance 'cl-dot:attributed
-			   :object  ptr
-			   :attributes '(:weight 3))))))
+          collect
+            (make-instance 'cl-dot:attributed
+                           :object  ptr
+                           :attributes '(:weight 3))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Layer for the reading of the disassembly
@@ -1177,54 +1090,54 @@ single core."
   (let*
       ;; this cleans some spaces and the pesky newline out
       ((cleaned-address
-	(cl-ppcre:regex-replace-all
-	 "\\s|\\n"
-	 address-string ""))
+        (cl-ppcre:regex-replace-all
+         "\\s|\\n"
+         address-string ""))
 
        ;;Parse the string
        (result
-	(cl-ppcre:register-groups-bind
-	    (position core address)
-	    ("(\\w+?)(\\d+)>:0x(\\w+):" cleaned-address)
+        (cl-ppcre:register-groups-bind
+            (position core address)
+            ("(\\w+?)(\\d+)>:0x(\\w+):" cleaned-address)
 
-	  ;;Returns this list
-	  (list
-	   ;;Allow integer compares of a core
-	   (parse-integer core)
-	   ;;Use a symbol here.
-	   (if (string= "starttrace" position)
-	       'START
-	       'END)
-	   ;;Use the string hex address
-	   address))))
+          ;;Returns this list
+          (list
+           ;;Allow integer compares of a core
+           (parse-integer core)
+           ;;Use a symbol here.
+           (if (string= "starttrace" position)
+               'START
+               'END)
+           ;;Use the string hex address
+           address))))
 
     (if result
-	result
-	(error "Unable to parse: ~a~&" cleaned-address))))
+        result
+        (error "Unable to parse: ~a~&" cleaned-address))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun load-xobjdump (filename)
   "Loads the disassembly file `filename` into a collection of cores
 and the trace locations they map to."
   (let* ((text (batteries:read-text-file filename))
-	 ;(error "This needs to be split into the memory maps for each core")
-	 ;;Suck out the critical parts
-	 (scanner (cl-ppcre:create-scanner
-		   "(start|end)trace(\\d+)>:.*?0x(\\w+):" :single-line-mode t))
-	 (address-strings (cl-ppcre:all-matches-as-strings
-			   scanner
-			   text))
-	 (trace-locations (make-hash-table)))
+         ;(error "This needs to be split into the memory maps for each core")
+         ;;Suck out the critical parts
+         (scanner (cl-ppcre:create-scanner
+                   "(start|end)trace(\\d+)>:.*?0x(\\w+):" :single-line-mode t))
+         (address-strings (cl-ppcre:all-matches-as-strings
+                           scanner
+                           text))
+         (trace-locations (make-hash-table)))
 
     (loop for address-string in address-strings
        do
-	 (let ((record (parse-address-string address-string)))
-	   ;;Convert this into a data structure that we can use
-	   (hashset trace-locations
-		    (first record)
-		    ;;start/end   address
-		    (acons (second record) (third record)
-			   (hashget trace-locations (first record))))))
+         (let ((record (parse-address-string address-string)))
+           ;;Convert this into a data structure that we can use
+           (hashset trace-locations
+                    (first record)
+                    ;;start/end   address
+                    (acons (second record) (third record)
+                           (hashget trace-locations (first record))))))
     trace-locations))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1247,54 +1160,54 @@ If core has no trace on it, then an empty run is returned."
   (unless (= (length (list-of-cores-in-run run) ) 1)
     ;; There's an error!
     (if (= (semantic-run-count run) 0)
-	;; Oh, wait, it's just an empty run
-	(return-from filter-untraced-location run)
-	;; Oh, it's not- that's bad.
-	(error "Number of cores in trace is not 1: ~a"  (length (list-of-cores-in-run run) ))))
+        ;; Oh, wait, it's just an empty run
+        (return-from filter-untraced-location run)
+        ;; Oh, it's not- that's bad.
+        (error "Number of cores in trace is not 1: ~a"  (length (list-of-cores-in-run run) ))))
 
   (assert (= (first (list-of-cores-in-run run) )
-	     core))
+             core))
   (let ((start-address (get-trace-location objdump 'START core))
-	(end-address   (get-trace-location objdump 'END core))
-	(return-run    (make-semantic-run)))
+        (end-address   (get-trace-location objdump 'END core))
+        (return-run    (make-semantic-run)))
 
     ;;Early return
     (if (not (and start-address end-address))
-	(return-from filter-untraced-location
-	  return-run))
+        (return-from filter-untraced-location
+          return-run))
 
     ;;actual logic
     (let ((run-sequence  (semantic-run-sequence run))
-	  (gettingflop))		;flip-flop
+          (gettingflop))                ;flip-flop
       (loop for key in run-sequence
-	 do
-	   (let ((current-step (semantic-run-get-id run key)))
-	     (cond
-	       ;;start trace
-	       ((string=
-		 (cpu-step-pc current-step )
-	       start-address)
-		(setf gettingflop t)
-		(semantic-run-append return-run current-step))
+         do
+           (let ((current-step (semantic-run-get-id run key)))
+             (cond
+               ;;start trace
+               ((string=
+                 (cpu-step-pc current-step )
+               start-address)
+                (setf gettingflop t)
+                (semantic-run-append return-run current-step))
 
-	       ;;stop trace
-	       ((string=
-	       (cpu-step-pc current-step)
-	       end-address)
-		(setf gettingflop nil)
-		(semantic-run-append  return-run current-step))
+               ;;stop trace
+               ((string=
+               (cpu-step-pc current-step)
+               end-address)
+                (setf gettingflop nil)
+                (semantic-run-append  return-run current-step))
 
-	       ;;Otherwise...
-	       (t
-		(cond (gettingflop
-		       (semantic-run-append return-run current-step))))))))
+               ;;Otherwise...
+               (t
+                (cond (gettingflop
+                       (semantic-run-append return-run current-step))))))))
     return-run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod filter-for-traced-core ((trace semantic-run)  objdump core)
   (filter-untraced-location (filter-by-core  trace core)
-			    objdump
-			    core))
+                            objdump
+                            core))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun write-single-core-graph (trace objdump core filename)
@@ -1311,9 +1224,9 @@ If core has no trace on it, then an empty run is returned."
   "Returns the channel of communication the instruction `step` is
 communicating on."
   (assert (find
-	   (cpu-step-opcode inst)
-	   '("in" "int" "out" "outt")
-	   :test 'string=))
+           (cpu-step-opcode inst)
+           '("in" "int" "out" "outt")
+           :test 'string=))
   (cdr (assoc 'resource-counter (parse-resource-id (cpu-step-res-id inst)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1347,10 +1260,10 @@ communicating on."
 
 (defmethod stringme ((obj search-node))
   (format nil "~a  : -> ~a"
-	  ;obj
-	  (search-node-data obj)
-	  ;(search-node-type obj)
-	  (loop for next-obj in (search-node-ptr obj) collect (search-node-data next-obj))))
+          ;obj
+          (search-node-data obj)
+          ;(search-node-type obj)
+          (loop for next-obj in (search-node-ptr obj) collect (search-node-data next-obj))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; This is used for testing
@@ -1362,15 +1275,15 @@ communicating on."
 ;;Resets the graph
 (defun load-links()
   (setf *core0*
-	(list
-	 (make-search-node :data "A")        ;1
-	 (make-search-node :data "B")        ;2
-	 (make-search-node :data "C")        ;3
-	 (make-search-node :data "D")        ;4
-	 (make-search-node :data "E")        ;5
-	 (make-search-node :data "0")
-	 (make-search-node :data "1")
-	 (make-search-node :data "F")))
+        (list
+         (make-search-node :data "A")        ;1
+         (make-search-node :data "B")        ;2
+         (make-search-node :data "C")        ;3
+         (make-search-node :data "D")        ;4
+         (make-search-node :data "E")        ;5
+         (make-search-node :data "0")
+         (make-search-node :data "1")
+         (make-search-node :data "F")))
 
 
 
@@ -1420,7 +1333,7 @@ communicating on."
 (defmethod graph-next ((object start-node))
   ;;TODO: Does this even get called? It seems like magic.
   (mapcar 'car
-	  (concatenate 'list (start-node-core object))))
+          (concatenate 'list (start-node-core object))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod graph-next ((object final-node))
@@ -1456,21 +1369,21 @@ communicating on."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun all-paths (start end)
   (let ((stack (list (list start (list start)))) ; list of (node path) elements
-	(allpaths '()))
+        (allpaths '()))
     (do  ()
       ((not stack))
       (let ((item (pop stack)))
-	;(format t "~S~%" item)
+        ;(format t "~S~%" item)
         (let ((node (first item))
               (path (second item)))
-	  ;(format t "I: ~a~%" (graph-data node))
+          ;(format t "I: ~a~%" (graph-data node))
           (cond ((graph-equal node end)
-		   (push path allpaths)))
-		   ;(format t "*Q: ~a~%" path))))
+                   (push path allpaths)))
+                   ;(format t "*Q: ~a~%" path))))
           (loop for next in (graph-next node)
-	     do
-	       (cond ((not (in next path :test #'graph-equal))
-		      (push (list next (cons next path)) stack)))))))
+             do
+               (cond ((not (in next path :test #'graph-equal))
+                      (push (list next (cons next path)) stack)))))))
     ;; Push forms reverse lists
     (mapcar 'reverse allpaths)))
 
@@ -1480,11 +1393,11 @@ communicating on."
 object"
   (let ((new-run (make-semantic-run)))
     (loop for id in (semantic-run-sequence obj)
-	 do
-	 (if (eql
-	      (channel-of-comms  (semantic-run-get-id obj id))
-	      channel)
-	     (semantic-run-append new-run (semantic-run-get-id obj id))))))
+         do
+         (if (eql
+              (channel-of-comms  (semantic-run-get-id obj id))
+              channel)
+             (semantic-run-append new-run (semantic-run-get-id obj id))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod core-starts-comms-p ((obj semantic-run) core)
@@ -1496,11 +1409,11 @@ object"
   ;;We check the first transfer instruction.
   ;; It's either an in or an out. If it's an out, T. Else nil.
   (let* ((id (first (semantic-run-sequence (filter-by-core obj core))))
-	 (op  (semantic-run-get-id obj id)))
+         (op  (semantic-run-get-id obj id)))
     (cond (id
-	   ;(format t "~a~%" core)
-	   ;(format t "~a~%" op)
-	   (is-outgoing op )))))
+           ;(format t "~a~%" core)
+           ;(format t "~a~%" op)
+           (is-outgoing op )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod core-stopped-comms-p ((obj semantic-run) core)
@@ -1513,7 +1426,7 @@ object"
   ;; It's either an in or an out. If it's an out, T. Else nil.
   (assert (/= (length (semantic-run-sequence obj)) 0))
   (let* ((id (final (semantic-run-sequence (filter-by-core obj core))))
-	 (op  (semantic-run-get-id obj id)))
+         (op  (semantic-run-get-id obj id)))
     (is-incoming op )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1525,14 +1438,14 @@ Expects the semantic-run to hold all the cores of interest.
 "
   (loop for core from 0 upto 3 do
        (if (core-starts-comms-p obj core)
-	   (return-from which-core-started-talking core))))
+           (return-from which-core-started-talking core))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod which-core-stopped-talking ((obj semantic-run))
   "Like which-core-started-talking, but stopped"
   (loop for core from 0 upto 3 do
        (if (core-stopped-comms-p obj core)
-	   (return-from which-core-stopped-talking core))))
+           (return-from which-core-stopped-talking core))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod final-talkers ((obj semantic-run))
@@ -1543,9 +1456,9 @@ communications. That is, the IN-residuals."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod list-of-cores-in-run ((obj semantic-run))
   "Gives the list of the cores in the run"
-  (uniqueize (loop for step in (semantic-run-container obj)
-		collect
-		  (cpu-step-core step))))
+  (uniqueize (loop for step in (container obj)
+                collect
+                  (cpu-step-core step))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod other-core-in-comms ((obj semantic-run) core)
@@ -1553,7 +1466,7 @@ communications. That is, the IN-residuals."
 channel"
   (let ((core-list (list-of-cores-in-run obj)))
     (assert (= (length core-list )
-	       2))
+               2))
     (assert (in core core-list))
     (car (remove core core-list))))
 
@@ -1565,12 +1478,12 @@ channel"
 Does not filter based on core"
 
   (let* ((sequence (semantic-run-sequence obj))
-	(next-instruction-index (1+
-				 (position id sequence))))
+        (next-instruction-index (1+
+                                 (position id sequence))))
     (if (/= next-instruction-index (length sequence))
-	(semantic-run-get-id obj
-			     (elt (semantic-run-sequence obj) next-instruction-index))
-	nil)))
+        (semantic-run-get-id obj
+                             (elt (semantic-run-sequence obj) next-instruction-index))
+        nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod next-instruction-on-this-core ((obj semantic-run) (inst cpu-step))
@@ -1588,43 +1501,43 @@ Filters out cores that don't belong."
   "Side effect, modifies the cpu-step"
   (labels ((walker (look-at-predicate look-for-predicate)
 
-	     (let ((seen-list nil))
-	       ;;Figure out where this channel points
-	       (loop for step in alpha-seq do
-		  ;; Yep we looked at the current node
-		    (push step seen-list)
-		    (cond
-		      ;; If it's an in/outgoing, let's find the node
-		      ;; on the other side that might work for us.w
-		      ((funcall look-at-predicate (semantic-run-get-id obj step))
-		       (let ((found 0))
-			 ;;Find first two unseen nodes
-			 (loop named finder
-			    for index in beta-seq do
-			      (cond
-				;;When it's not seen...
-				((not (in index
-					  seen-list))
+             (let ((seen-list nil))
+               ;;Figure out where this channel points
+               (loop for step in alpha-seq do
+                  ;; Yep we looked at the current node
+                    (push step seen-list)
+                    (cond
+                      ;; If it's an in/outgoing, let's find the node
+                      ;; on the other side that might work for us.w
+                      ((funcall look-at-predicate (semantic-run-get-id obj step))
+                       (let ((found 0))
+                         ;;Find first two unseen nodes
+                         (loop named finder
+                            for index in beta-seq do
+                              (cond
+                                ;;When it's not seen...
+                                ((not (in index
+                                          seen-list))
 
-				 ;; If it's of the Type of Interest...
-				 (if (funcall look-for-predicate
-					      (semantic-run-get-id obj index))
-				     ;; We found something, so add it to the list
-				     (let ((other-step (semantic-run-get-id obj index))
-					   (current-step (semantic-run-get-id obj step)))
-				       (setf  (cpu-step-next current-step)
-					      (adjoin
-					       other-step
-					       (cpu-step-next current-step)))
-				       (incf found)))
+                                 ;; If it's of the Type of Interest...
+                                 (if (funcall look-for-predicate
+                                              (semantic-run-get-id obj index))
+                                     ;; We found something, so add it to the list
+                                     (let ((other-step (semantic-run-get-id obj index))
+                                           (current-step (semantic-run-get-id obj step)))
+                                       (setf  (cpu-step-next current-step)
+                                              (adjoin
+                                               other-step
+                                               (cpu-step-next current-step)))
+                                       (incf found)))
 
-				 ;;Insert it into the seen list
-				 (if (= found 1)
-				     (push index seen-list))
+                                 ;;Insert it into the seen list
+                                 (if (= found 1)
+                                     (push index seen-list))
 
-				 ;; If we found all 2 of them, stop looping
-				 (if (= found 2)
-				       (return-from finder  index))))))))))))
+                                 ;; If we found all 2 of them, stop looping
+                                 (if (= found 2)
+                                       (return-from finder  index))))))))))))
 
     (walker #'is-outgoing #'is-incoming)
     (walker #'is-incoming #'is-outgoing)))
@@ -1654,31 +1567,31 @@ in), we can inductively walk up to the last operation."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-node ((object start-node))
   (make-instance 'cl-dot:node
-		 :attributes (list
-			      :label "start"
-			      :shape :diamond)))
+                 :attributes (list
+                              :label "start"
+                              :shape :diamond)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-node ((object list))
   (make-instance 'cl-dot:node
-		 :attributes (list
-			      :label "null"
-			      :shape :circle)))
+                 :attributes (list
+                              :label "null"
+                              :shape :circle)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-node ((object final-node))
   (make-instance 'cl-dot:node
-		 :attributes (list
-			      :label "end"
-			      :shape :diamond)))
+                 :attributes (list
+                              :label "end"
+                              :shape :diamond)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod cl-dot:object-points-to ((object start-node))
   (loop for core across (start-node-core object)
        collect
        (make-instance 'cl-dot:attributed
-		      :object  (car core)
-		      :attributes '(:weight 1))))
+                      :object  (car core)
+                      :attributes '(:weight 1))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful for debugging interactively
@@ -1698,54 +1611,54 @@ in), we can inductively walk up to the last operation."
   "Prepare the entire graph from the brought-in trace and the objdump
 Returns the starting node to send to the rendering routines"
   (let ((top-node (make-start-node))
-	(end-node (make-final-node))
-	(trace (clone base-trace)))
+        (end-node (make-final-node))
+        (trace (clone base-trace)))
 
     (let ((full-run
-	   (merge-semantic-runs
-	    ;; this block could be simplified if merge-semantic-runs
-	    ;; was modified to take a single list; then a (loop
-	    ;; ... collect ) could be used.
-	    (prune-duplicate-ins
-	     (filter-for-transfer
-	      (filter-for-traced-core  trace objdump 0))
-	     transaction)
-	    (prune-duplicate-ins
-	     (filter-for-transfer
-	      (filter-for-traced-core  trace objdump 1))
-	      transaction)
-	    (prune-duplicate-ins
-	     (filter-for-transfer
-	      (filter-for-traced-core  trace objdump 2))
-	     transaction)
-	    (prune-duplicate-ins
-	     (filter-for-transfer
-	      (filter-for-traced-core  trace objdump 3))
-	     transaction))))
+           (merge-semantic-runs
+            ;; this block could be simplified if merge-semantic-runs
+            ;; was modified to take a single list; then a (loop
+            ;; ... collect ) could be used.
+            (prune-duplicate-ins
+             (filter-for-transfer
+              (filter-for-traced-core  trace objdump 0))
+             transaction)
+            (prune-duplicate-ins
+             (filter-for-transfer
+              (filter-for-traced-core  trace objdump 1))
+              transaction)
+            (prune-duplicate-ins
+             (filter-for-transfer
+              (filter-for-traced-core  trace objdump 2))
+             transaction)
+            (prune-duplicate-ins
+             (filter-for-transfer
+              (filter-for-traced-core  trace objdump 3))
+             transaction))))
 
       ;;Side-effect!!!!!
       (linearize-communication full-run)
 
       (loop for core from 0 upto 3 do
-	(setf (elt (start-node-core top-node) core)
-	      (pre-render-semantic-run
-	       (prune-duplicate-ins
-		(filter-for-transfer
-		 (filter-for-traced-core trace objdump core))
-		transaction))))
+        (setf (elt (start-node-core top-node) core)
+              (pre-render-semantic-run
+               (prune-duplicate-ins
+                (filter-for-transfer
+                 (filter-for-traced-core trace objdump core))
+                transaction))))
 
 
     ;;Which cores had channels which were terminations of
     ;;communication? Link them to the end
       (let ((finished-conversation (final-talkers full-run)))
-	(loop for core in finished-conversation
-	   do
-	     (setf (cpu-step-next
-		    (final
-		     (elt (start-node-core top-node) core)))
-		   (list end-node))))
+        (loop for core in finished-conversation
+           do
+             (setf (cpu-step-next
+                    (final
+                     (elt (start-node-core top-node) core)))
+                   (list end-node))))
 
-	(values top-node end-node))))
+        (values top-node end-node))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun generate-consolidated-graph (trace objdump filename &optional transaction)
@@ -1783,9 +1696,9 @@ Returns the starting node to send to the rendering routines"
 (defun prune-too-short-paths (all-paths trace objdump &optional transaction)
   (let ((actual-length (semantic-run-count (gather-runs trace objdump transaction))))
     (remove-if #'(lambda (list)
-		   ;; Remember the passed-in list has pseudo start/end nodes
-		   (/= (length list) (+ actual-length 2)))
-	       all-paths)))
+                   ;; Remember the passed-in list has pseudo start/end nodes
+                   (/= (length list) (+ actual-length 2)))
+               all-paths)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun path-to-run (list)
@@ -1819,25 +1732,25 @@ Returns the starting node to send to the rendering routines"
   (remove-if-not
    #'(lambda (path)
        (let ((pairs (batteries:gather-generator
-		     (butlast (cdr path))
-		     'batteries:sliding-window-2-wide
-		     'batteries:sliding-chunker))
-	     ;; Not bad yet.
-	     (bad nil))
+                     (butlast (cdr path))
+                     'batteries:sliding-window-2-wide
+                     'batteries:sliding-chunker))
+             ;; Not bad yet.
+             (bad nil))
 
 
-	 (loop for (step next) in pairs
-	      do
-	      (cond ((is-outgoing step)
-	      	     (unless (is-incoming next)
-	      	       (setf bad t)))
-	      	    ((is-incoming step)
-	      	     (unless (is-outgoing next)
-	      	       (setf bad t)))
-	      	    (t
-	      	     (error "+++Mr. Jelly! Mr. Jelly!+++" )))
-	      )
-	 (not bad)))
+         (loop for (step next) in pairs
+              do
+              (cond ((is-outgoing step)
+                     (unless (is-incoming next)
+                       (setf bad t)))
+                    ((is-incoming step)
+                     (unless (is-outgoing next)
+                       (setf bad t)))
+                    (t
+                     (error "+++Mr. Jelly! Mr. Jelly!+++" )))
+              )
+         (not bad)))
    list-of-paths))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1853,7 +1766,7 @@ Returns the starting node to send to the rendering routines"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod reset-linearization ((obj semantic-run))
   "Sets all the links for the non-instruction paths to nil"
-  (loop for var in (semantic-run-container obj)
+  (loop for var in (container obj)
      do
        (setf (cpu-step-next var) nil)))
 
@@ -1862,11 +1775,11 @@ Returns the starting node to send to the rendering routines"
   "Returns a list of ids"
   (loop for node in list
      collect (cond ((eq (type-of node) 'START-NODE)
-		    'START-NODE)
-		   ((eq (type-of node) 'FINAL-NODE)
-		    'END-NODE)
-		   (t
-		    (cpu-step-u-id node)))))
+                    'START-NODE)
+                   ((eq (type-of node) 'FINAL-NODE)
+                    'END-NODE)
+                   (t
+                    (cpu-step-u-id node)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun apply-linearization (list)
@@ -1882,25 +1795,25 @@ list ::= ( start-node cpu-step* final-node)
 "
   ;;Remove start and end nodes
   (let* ((cpu-step-list  (loop for node in (butlast (cdr list))
-			    collect (clone node)))
-	 (start-node (make-start-node))
-	 (final-node (make-final-node))
-	 ;;List of pairs
-	(step-pairs
-	 (batteries:gather-generator
-	  cpu-step-list
-	  'batteries:sliding-window-2-wide
-	  'batteries:sliding-chunker)))
+                            collect (clone node)))
+         (start-node (make-start-node))
+         (final-node (make-final-node))
+         ;;List of pairs
+        (step-pairs
+         (batteries:gather-generator
+          cpu-step-list
+          'batteries:sliding-window-2-wide
+          'batteries:sliding-chunker)))
 
 
     (loop for (step next) in step-pairs
        do
-	 ;; Set up the link correctly
-	 (setf (cpu-step-next step)  (list next))
-	 (setf (cpu-step-next-inst step) nil))
+         ;; Set up the link correctly
+         (setf (cpu-step-next step)  (list next))
+         (setf (cpu-step-next-inst step) nil))
 
     (setf (elt (start-node-core start-node) 0)
-	  (list (car cpu-step-list)))
+          (list (car cpu-step-list)))
 
     (setf (cpu-step-next (final cpu-step-list)) (list final-node))
 
@@ -1914,33 +1827,33 @@ list ::= ( start-node cpu-step* final-node)
 ;; Generates the set of linearization graphs
 (defun build-all-feasible-path-images (trace objdump png-prefix &optional transaction)
   (loop for path in (mapcar
-		     'apply-linearization
-		     (find-feasible-paths-for-trace trace objdump transaction))
+                     'apply-linearization
+                     (find-feasible-paths-for-trace trace objdump transaction))
      do
        (dump-graph (car path)
-		   (format nil "~a-path-~a.png"
-			   png-prefix
-			   (funcall *counter-closure*)))))
+                   (format nil "~a-path-~a.png"
+                           png-prefix
+                           (funcall *counter-closure*)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun render-linearized-paths (filename-prefix &optional transaction)
   "Only renderes the linearized path"
   (let ((trace (load-a-sim-file (strcat filename-prefix ".trace")))
-	(objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
+        (objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
     (build-all-feasible-path-images trace objdump filename-prefix transaction)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun render-all-paths (filename-prefix output-png &optional transaction)
   "Only renders all paths"
   (let ((trace (load-a-sim-file (strcat filename-prefix ".trace")))
-	(objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
+        (objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
     (generate-consolidated-graph trace objdump output-png transaction)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun render-trace (filename-prefix output-png &optional transaction)
   "Renders both the linearized and all paths pngs"
   (let ((trace (load-a-sim-file (strcat filename-prefix ".trace")))
-	(objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
+        (objdump (load-xobjdump (strcat filename-prefix ".objdump"))))
     (build-all-feasible-path-images trace objdump output-png transaction)
     (generate-consolidated-graph trace objdump (format nil "~a-all.png" output-png) transaction)))
 
@@ -1948,17 +1861,17 @@ list ::= ( start-node cpu-step* final-node)
 ;; use when calling by #!/script
 (defun main(args)
   (let ((fileprefix (first args))
-	(transaction (second args)))
+        (transaction (second args)))
     (cond ((not fileprefix)
-	   (format t "Syntax: sim-reader.lisp prefix-of-files [t]~%"))
-	  (t
-	   (let ((paths-name (join-paths
-			      (getcwd)
-			      (strcat
-			       (file-namestring fileprefix) ""))))
-	     (render-trace fileprefix
-			   paths-name
-			   transaction))))))
+           (format t "Syntax: sim-reader.lisp prefix-of-files [t]~%"))
+          (t
+           (let ((paths-name (join-paths
+                              (getcwd)
+                              (strcat
+                               (file-namestring fileprefix) ""))))
+             (render-trace fileprefix
+                           paths-name
+                           transaction))))))
 
 ;(main (rest (batteries:getargs)))
 
@@ -1969,37 +1882,37 @@ list ::= ( start-node cpu-step* final-node)
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun load-exchange ()
 ;;   (setf *trace*
-;; 	(load-a-sim-file "../../programs_of_interest/one-transfer.trace"))
+;;      (load-a-sim-file "../../programs_of_interest/one-transfer.trace"))
 ;;   (setf *objdump*
-;; 	(load-xobjdump "../../programs_of_interest/one-transfer.objdump")))
+;;      (load-xobjdump "../../programs_of_interest/one-transfer.objdump")))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun load-disjoint ()
 ;;   (setf *trace*
-;; 	(load-a-sim-file "../../programs_of_interest/disjoint.trace"))
+;;      (load-a-sim-file "../../programs_of_interest/disjoint.trace"))
 ;;   (setf *objdump*
-;; 	(load-xobjdump "../../programs_of_interest/disjoint.objdump")))
+;;      (load-xobjdump "../../programs_of_interest/disjoint.objdump")))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun load-producer-consumer ()
 ;;   (setf *trace*
-;; 	(load-a-sim-file "../../programs_of_interest/simple-p-c.trace"))
+;;      (load-a-sim-file "../../programs_of_interest/simple-p-c.trace"))
 ;;   (setf *objdump*
-;; 	(load-xobjdump "../../programs_of_interest/simple-p-c.objdump")))
+;;      (load-xobjdump "../../programs_of_interest/simple-p-c.objdump")))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun load-three-transfer ()
 ;;   (setf *trace*
-;; 	(load-a-sim-file "../../programs_of_interest/three-transfer.trace"))
+;;      (load-a-sim-file "../../programs_of_interest/three-transfer.trace"))
 ;;   (setf *objdump*
-;; 	(load-xobjdump "../../programs_of_interest/three-transfer.objdump")))
+;;      (load-xobjdump "../../programs_of_interest/three-transfer.objdump")))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defun load-multi-transfer ()
 ;;   (setf *trace*
-;; 	(load-a-sim-file "../../programs_of_interest/multi-transfer.trace"))
+;;      (load-a-sim-file "../../programs_of_interest/multi-transfer.trace"))
 ;;   (setf *objdump*
-;; 	(load-xobjdump "../../programs_of_interest/multi-transfer.objdump")))
+;;      (load-xobjdump "../../programs_of_interest/multi-transfer.objdump")))
 
 ;; (defun load-file (prefix)
 ;;   (setf *trace* (load-a-sim-file (strcat prefix ".trace")))
@@ -2008,3 +1921,67 @@ list ::= ( start-node cpu-step* final-node)
 
 
 ;(generate-consolidated-graph *trace* *objdump* "/path/to/a/pngfile.png")
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; helper functions for repl development
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((step cpu-step) &key (all nil) (res-info nil))
+
+  (labels
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ((t-a (str)
+         "Tab append. For setting the pretty-print stuff"
+         (concatenate
+          'string
+          str
+          "~1,7T")))
+
+    (format t (t-a "~a") (u-id step))
+    (format t (t-a "~a") (opcode step))
+    (format t (t-a "R V ~a") (register-modifications step))
+
+    (if all
+        (format t (t-a "PC ~a") (pc step)))
+
+    (format t (t-a "core ~a") (core step))
+    (format t (t-a "cycle ~a") (cycle step))
+    (if (out step)
+        (format t (t-a "out ~a") (out step)))
+
+    (if res-info
+        (if (res-id step)
+            (format t (t-a "res-id 0x~x") (res-id step))))
+
+    (if (next-inst step)
+        (format t (t-a "|> ~a")
+                (loop for var in (next-inst step)
+                   collect
+                     (u-id var))))
+    (if (next step)
+        (format t (t-a "-> ~a")
+                (loop for var in (next step)
+                   collect
+                     (if (eql (type-of var) 'CPU-STEP)
+                       (u-id var)
+                       'END-NODE))))
+
+    (format t "~%")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj final-node) &key)
+  (format t "end~%"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj start-node) &key)
+  (format t "start~%"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defmethod clean-print ((obj semantic-run) &key (all nil) (res-info nil))
+  (loop for id in (semantic-run-sequence obj)
+     do
+       (let ((step (semantic-run-get-id obj id)))
+         (clean-print step :all all :res-info res-info))))
