@@ -14,7 +14,7 @@
 ;; using the CALISPEL library, which implements CSP around a GIL.
 
 
-(ql:quickload :bordeaux-threads)	;standard thread lib for cl
+(ql:quickload :bordeaux-threads)        ;standard thread lib for cl
 (asdf:load-system :batteries)
 
 ;; this adds the sweet BIND macro
@@ -38,13 +38,13 @@
 
 (defmethod initialize-instance :after ((queue safe-queue) &key)
   (setf (lock queue)
-	(bordeaux-threads:make-lock
-	 (format nil "safe-queue-lock: ~a" (name queue)))))
+        (bordeaux-threads:make-lock
+         (format nil "safe-queue-lock: ~a" (name queue)))))
 
 (defmethod push-queue ((obj safe-queue) data)
   (bordeaux-threads:with-lock-held ((lock obj))
     (setf (data obj)
-	  (append (data obj) (list (ensure-list data))))))
+          (append (data obj) (list (ensure-list data))))))
 
 (defmethod retrieve ((obj safe-queue))
   (bordeaux-threads:with-lock-held ((lock obj))
@@ -54,7 +54,7 @@
   (print-unreadable-object (obj stream :identity t)
     (bordeaux-threads:with-lock-held ((lock obj))
       (loop for ele in (data obj) do
- 	   (format stream "~a~&" ele)))))
+           (format stream "~a~&" ele)))))
 
 ;;; Utilities
 (defun ensure-list (x)
@@ -82,31 +82,31 @@
 (defclass core ()
   ;; the string denoting the core
   ((name :accessor name
-	:initform nil
-	:initarg :name)
+        :initform nil
+        :initarg :name)
    ;; the function to start execution
    (entrypoint :accessor entrypoint
-	       :initform nil
-	       :initarg :entrypoint)
+               :initform nil
+               :initarg :entrypoint)
    ;; the args that the entrypoint needs to begin
    (args :accessor args
-	 :initform nil
-	 :initarg arglist)
+         :initform nil
+         :initarg arglist)
 
    ;; program counter for communication
    (counter :accessor counter
-	    :initform 0)
+            :initform 0)
    (counter-lock :accessor counter-lock
-		 :initform nil)
+                 :initform nil)
 
    ;; funcallable that cleans up the core.
    (cleanup :accessor cleanup
-	    :initform nil
-	    :initarg cleanup)))
+            :initform nil
+            :initarg cleanup)))
 
 (defmethod initialize-instance :after ((core core) &key)
   (setf (counter-lock core)
-	(bordeaux-threads:make-lock (name core))))
+        (bordeaux-threads:make-lock (name core))))
 
 
 (defmethod print-object ((core core) stream)
@@ -181,41 +181,41 @@
 (defclass channel ()
   ;; string denoting the name of the channel
   ((name :accessor name
-	 :initarg :name)
+         :initarg :name)
    ;; source core
    (source :accessor source
-	   :initform nil
-	   :initarg :source)
+           :initform nil
+           :initarg :source)
 
    ;; dst core
    (dest :accessor dest
-	 :initform nil
-	 :initarg :dest)
+         :initform nil
+         :initarg :dest)
 
    ;; This is the data channel
    (data-lock :accessor data-lock
-	      :initform nil
-	      :initarg :data-lock )
+              :initform nil
+              :initarg :data-lock )
    (data :accessor channel-data :initform nil)
 
    ;;Sending is the control channel
    (sending-lock :accessor sending-lock
-		 :initform nil
-		 :initarg :sending-lock)
+                 :initform nil
+                 :initarg :sending-lock)
    (sending :accessor sending
-	    :initform nil
-	    :initarg :sending)))
+            :initform nil
+            :initarg :sending)))
 
 (defmethod initialize-instance :after ((channel channel) &key)
   "Initializes the locks as soon as we create the instance"
 
   (setf (data-lock channel)
-	(bordeaux-threads:make-lock
-	 (format nil "data-lock-(~a)" (name channel))))
+        (bordeaux-threads:make-lock
+         (format nil "data-lock-(~a)" (name channel))))
 
   (setf (sending-lock channel)
-	(bordeaux-threads:make-lock
-	 (format nil "sending-lock-(~a)" (name channel)))))
+        (bordeaux-threads:make-lock
+         (format nil "sending-lock-(~a)" (name channel)))))
 
 ;; shorthand constructors
 (defun make-channel (name)
@@ -231,21 +231,21 @@
 (defmethod start-core ((core core))
   "Starts a core with the settings defined in the core object"
   (let ((bordeaux-threads:*default-special-bindings* (acons '*core-id* core nil)))
-	(bordeaux-threads:make-thread
-	  #'(lambda ()
-	      (if (args core)
-		  (funcall (entrypoint core) (args core))
-		  (funcall (entrypoint core)))
-	      (when (cleanup core)
-		  (funcall (cleanup core) core)))
-	  :name (name core))))
+        (bordeaux-threads:make-thread
+          #'(lambda ()
+              (if (args core)
+                  (funcall (entrypoint core) (args core))
+                  (funcall (entrypoint core)))
+              (when (cleanup core)
+                  (funcall (cleanup core) core)))
+          :name (name core))))
 
 (defmethod new-channel ((sender core) (receiver core))
   "Creates a channel connecting `sender` and `receiver`"
   (let ((channel (make-channel
-		  (format nil "~a ~~> ~a"
-			  (name sender)
-			  (name receiver)))))
+                  (format nil "~a ~~> ~a"
+                          (name sender)
+                          (name receiver)))))
     (configure-channel channel sender receiver)
     channel))
 
@@ -274,10 +274,10 @@
     (loop
        until (eql waiting nil)
        do
-	 (bordeaux-threads:with-lock-held ((sending-lock channel))
-	   ;; If it's nil...
-	   (when (eql value (sending channel))
-	     (setf waiting nil))))))
+         (bordeaux-threads:with-lock-held ((sending-lock channel))
+           ;; If it's nil...
+           (when (eql value (sending channel))
+             (setf waiting nil))))))
 
 (defmethod send ((channel channel) data)
   (poll-until channel nil)
@@ -304,7 +304,7 @@
   (let ((core (source channel)))
     (when (recording-p core)
       (append-record core
-		     (list *core-id*
+                     (list *core-id*
                            (name channel)
                            :tx
                            (counter (source channel))))))
@@ -332,7 +332,7 @@
   (let ((channel (car channel)))
     (start-recording)
     (loop for i from 0 upto 30 do
-	 (send channel i))
+         (send channel i))
     (stop-recording)))
 
 (defun consumer (channel)
@@ -340,14 +340,14 @@
     (start-recording)
     (loop for i from 0 upto 30 do
       (let ((data (receive channel)))
-	;(format t "Got: ~a~%" data)
-	))
+        ;(format t "Got: ~a~%" data)
+        ))
     (stop-recording)))
 
 (defun do-pc()
   (let* ((producer (make-core "producer" #'producer :recording t))
-	 (consumer (make-core "consumer" #'consumer :recording t))
-	 (channel (new-channel producer consumer)))
+         (consumer (make-core "consumer" #'consumer :recording t))
+         (channel (new-channel producer consumer)))
 
     (setf (args producer) (list channel))
     (setf (args consumer) (list channel))
@@ -371,7 +371,7 @@
       (cond  ((oddp i)
               (receive channel1)
               (receive channel2))
-	     (t
+             (t
               (receive channel2)
               (receive channel1))))
     (stop-recording)
@@ -385,12 +385,12 @@
 
 (defun do-network ()
   (let* ((node1 (make-core "node1" #'node1 :recording t))
-	 (node2 (make-core "node2" #'node2 :recording t))
-	 (node3 (make-core "node3" #'node3 :recording t))
+         (node2 (make-core "node2" #'node2 :recording t))
+         (node3 (make-core "node3" #'node3 :recording t))
 
          ;; create links
-	 (channel1 (new-channel node1 node2))
-	 (channel2 (new-channel node2 node3)))
+         (channel1 (new-channel node1 node2))
+         (channel2 (new-channel node2 node3)))
     ;; initialize the channels for the cores.
     (setf (args node1) channel1)
     (setf (args node2) (list channel1 channel2))
@@ -411,13 +411,21 @@ writing to a file."
 
   (loop for id in (alexandria:hash-table-keys history)
         collect
-        (loop for comm in  (gethash id history)
-              collect
-	     ;; ID
-              (list id  (second comm) (fourth comm) (third comm) ))))
+        (list
+         (cons :thread id)
+         (cons :data
+               (loop for comm in  (gethash id history)
+                  collect
+                    (list (cons :name
+                                (second comm))
+                          (cons :sequence-id
+                                (fourth comm))
+                          (cons :type
+                                (third comm)) ))))))
 
 
 (defun write-history (history filename)
-  (batteries:write-text-file
+  (alexandria:write-string-into-file
+   (format nil "~s" (emit-readable-history history))
    filename
-   (emit-readable-history history)))
+   :if-exists :overwrite))
