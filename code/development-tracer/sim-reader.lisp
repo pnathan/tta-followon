@@ -236,37 +236,37 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; A simulation object.
 ;;; This will get rendered out to the debug windows
-(defobject cpu-step (
-                               core    ;core
-                               thread  ;thread id
-                               opcode  ;asm op
-                               cycle   ;cycle (only relevant for sims)
-                               pc      ;program counter
-                               lr      ;link register
-                               sp      ;stack pointer
-                               cp      ;constant pointer
-                               dp      ;data pointer
-                               res-id  ;Resource id.
-                               (reg
+(defobject cpu-step
+    (core    ;core
+     thread  ;thread id
+     opcode  ;asm op
+     cycle   ;cycle (only relevant for sims)
+     pc      ;program counter
+     lr      ;link register
+     sp      ;stack pointer
+     cp      ;constant pointer
+     dp      ;data pointer
+     res-id  ;Resource id.
+     (reg
                                         ;simply specifying #(...)
                                         ;yields the same referent in
                                         ;memory.
-                                (make-array '(12)
-                                            :initial-contents
-                                            #(nil nil nil
-                                              nil nil nil
-                                              nil nil nil
-                                              nil nil nil)))
-                               out      ;Data being sent out
-                               marked   ;Has this been marked
-                               u-id     ;Used to id the step for this particular run.
+      (make-array '(12)
+                  :initial-contents
+                  #(nil nil nil
+                    nil nil nil
+                    nil nil nil
+                    nil nil nil)))
+     out      ;Data being sent out
+     marked   ;Has this been marked
+     u-id     ;Used to id the step for this particular run.
 
-                               next-inst ;The next instruction this
-                                         ;can points to
-                               next      ;The set of other
-                                         ;instructions that the
-                                         ;sequencing can point at.
-                               )
+     next-inst ;The next instruction this
+                                        ;can points to
+     next      ;The set of other
+                                        ;instructions that the
+                                        ;sequencing can point at.
+     )
   :undecorated t
   :superclasses '(comm-node)
   :documentation "The context of a given CPU state at the end of an instruction
@@ -659,9 +659,6 @@ Expects something of the form  *resource-parsing-string*
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Generalized interface
 
-(defun load-ifc-file (filename)
-  (read-from-string
-   (batteries:read-text-file filename)))
 
 (defobject sexpr-step (core-id src dst core-op op-id)
   :documentation "One step from the sexpr codes"
@@ -874,6 +871,18 @@ core"
   (semantic-parse-run
    (lexically-parse-sim
     (read-sim-file filename))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun read-ifc-file (filename)
+  (read-from-string
+   (alexandria:read-file-into-string filename)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun load-ifc-file (filename)
+  "Loads a file in the standard TTA trace format"
+  (read-ifc-file filename))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Probably usable on a lexical-run as well
