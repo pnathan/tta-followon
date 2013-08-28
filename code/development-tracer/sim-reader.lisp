@@ -88,10 +88,14 @@
   (not (not var)))
 ;;; Logic
 
+(defmacro gassoc (item alist)
+  "Gets the data from assoc"
+  `(cdr (assoc ,item ,alist )))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defgeneric printme (object)
- (:documentation
-  "PRINTME is the standard debugging routine used here for the
+  (:documentation
+   "PRINTME is the standard debugging routine used here for the
   objects"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -111,7 +115,7 @@ Ignored lines:
 Event caused | DBG_INT
 "
   (let ((file-text-list (cl-ppcre:split "\\n"
-                               (batteries:read-text-file filename))))
+                                        (batteries:read-text-file filename))))
     (remove-if #'not
                (loop for line in file-text-list
                   collect
@@ -167,8 +171,8 @@ FIFO"
 instruction: returns a `lexical-instruction` object"
   (let ((result
          (cl-ppcre:register-groups-bind
-             ;(core thread)
-             ;("stdcore\\[(\\d)\\]@(\\d)"
+                                        ;(core thread)
+                                        ;("stdcore\\[(\\d)\\]@(\\d)"
              (core thread  nil pc  op reginfo  cycle)
              ("stdcore\\[(\\d)\\]@(\\d)..+?(\.|-)+?([0-9A-Fa-f]{8}).+?:\\s(\\w+)\\s+(.*?)\\s+@(\\d+)"
               sim-line)
@@ -218,9 +222,9 @@ instruction: returns a `lexical-instruction` object"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defobject start-node ((core (make-array
-                                        '(4)
-                                        :initial-contents
-                                        #(nil nil nil nil) )))
+                              '(4)
+                              :initial-contents
+                              #(nil nil nil nil) )))
   :superclasses '(comm-node)
   :undecorated t
   :documentation "Start node for all operations; TOP in the lattice of
@@ -275,7 +279,7 @@ instruction: returns a `lexical-instruction` object"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj cpu-step))
-    (print-hash-table-1 (object-to-hash obj)))
+  (print-hash-table-1 (object-to-hash obj)))
 
 
 
@@ -447,7 +451,7 @@ instruction: returns a `lexical-instruction` object"
 
 (defvar *register-register-register-offset*
   '("lda16")
-"lda16   r0 0x000100da , r1 0x000102ac [-r0 0x000000e9 ]")
+  "lda16   r0 0x000100da , r1 0x000102ac [-r0 0x000000e9 ]")
 
 (defvar *sp-instructions*
   '("entsp"
@@ -457,7 +461,7 @@ instruction: returns a `lexical-instruction` object"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; This regex is used to parse a register with value string
 (defparameter *reg-parsing-string* "r(\\w+)\\(0x(\\w+)\\)$"
-    "This parses 'r1(0x0000000b)'")
+  "This parses 'r1(0x0000000b)'")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun parse-dst-reg (regstring)
@@ -467,16 +471,16 @@ Returns a (VALUES dst-register register-value).
 
 Both dst-register and register-value are a number"
   (let ((result (cl-ppcre:register-groups-bind
-                   (reg value)
-                   (*reg-parsing-string*
-                    regstring)
+                    (reg value)
+                    (*reg-parsing-string*
+                     regstring)
                   (list reg value)
                   )))
     (if result
         (values (parse-integer (first result))
-              (parse-integer (second result) :radix 16))
+                (parse-integer (second result) :radix 16))
 
-      (error "Unable to parse: ~a" regstring))))
+        (error "Unable to parse: ~a" regstring))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defparameter *resource-parsing-string*
@@ -582,57 +586,57 @@ Expects something of the form  *resource-parsing-string*
          (if (string= op "ldw")
              (assign-to-reg-state list)))
 
-         ((find op *sp-instructions* :test 'string=)
-          ;;TODO: futz with sp/lr
-          ;;sp-modifying instructions, possibl lr as well.
-          )
+        ((find op *sp-instructions* :test 'string=)
+         ;;TODO: futz with sp/lr
+         ;;sp-modifying instructions, possibl lr as well.
+         )
 
-         ((find op *register-immediate-instructions* :test 'string=)
-          ;;("r1 0x0000000b" "i 0x0000000b")
-          (assign-to-reg-state list))
+        ((find op *register-immediate-instructions* :test 'string=)
+         ;;("r1 0x0000000b" "i 0x0000000b")
+         (assign-to-reg-state list))
 
-         ((find op *get-instructions* :test 'string=)
-          ;;r0 0x00010000 , ps[r1 0x0000000b ] @9
-          (assign-to-reg-state list))
+        ((find op *get-instructions* :test 'string=)
+         ;;r0 0x00010000 , ps[r1 0x0000000b ] @9
+         (assign-to-reg-state list))
 
-         ((find op *register-register-register-instructions* :test 'string=)
-          ;;("r0 0x00020000" "r10 0x00010000" "r11 0x00010000")
-          (assign-to-reg-state list))
+        ((find op *register-register-register-instructions* :test 'string=)
+         ;;("r0 0x00020000" "r10 0x00010000" "r11 0x00010000")
+         (assign-to-reg-state list))
 
-         ((find op *resource-register-instructions* :test 'string=)
-          ;;ps[r2 0x0000010b ], r0 0x00010000
+        ((find op *resource-register-instructions* :test 'string=)
+         ;;ps[r2 0x0000010b ], r0 0x00010000
 
-          ;;Here we do not edit the state of the CPU proper, but instead
-          ;;modify some output or jtag setting.
+         ;;Here we do not edit the state of the CPU proper, but instead
+         ;;modify some output or jtag setting.
 
-          ;;Set can do a lot of things. Right now we're not interested
-          ;;in set. Just out & its kin.
-          (cond
-            ((string= op "out")
-             (multiple-value-bind (reg value)
-                 (parse-dst-reg (second list))
-             (setf (out register-state)
-                   value))))
+         ;;Set can do a lot of things. Right now we're not interested
+         ;;in set. Just out & its kin.
+         (cond
+           ((string= op "out")
+            (multiple-value-bind (reg value)
+                (parse-dst-reg (second list))
+              (setf (out register-state)
+                    value))))
 
-          (if (not (string= op "set"))
-              (assign-to-res-state list)))
+         (if (not (string= op "set"))
+             (assign-to-res-state list)))
 
-         ((find op *immediate-instructions* :test 'string=)
-          ;;bl      i 0x0000000f
+        ((find op *immediate-instructions* :test 'string=)
+         ;;bl      i 0x0000000f
 
-          ;; These are branch instructions, which solely modify the
-          ;; PC. The current PC is discovered from the sim line.
+         ;; These are branch instructions, which solely modify the
+         ;; PC. The current PC is discovered from the sim line.
 
-          ;;extsp is also in this group, it modifies the SP
-          )
+         ;;extsp is also in this group, it modifies the SP
+         )
 
 
-         (t
-          (error "Operation not understood: ~a" op)))
-        ;;end cond
-        ;;set the operation
-        (setf (opcode register-state) op)
-        register-state)))
+        (t
+         (error "Operation not understood: ~a" op)))
+      ;;end cond
+      ;;set the operation
+      (setf (opcode register-state) op)
+      register-state)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod semantic-parse-instruction ((obj lexical-instruction))
@@ -660,7 +664,7 @@ Expects something of the form  *resource-parsing-string*
 ;;; Generalized interface
 
 
-(defobject sexpr-step (core-id src dst core-op op-id)
+(defobject sexpr-step (channel-id core-id src dst core-op op-id)
   :documentation "One step from the sexpr codes"
   :undecorated t)
 
@@ -671,15 +675,13 @@ Expects something of the form  *resource-parsing-string*
   (core-op obj))
 
 (defun parse-sexpr (form)
-  (bind (((core src _ dst op-id direction) form))
-    (make-sexpr-step :core-id core
-                     :src src
-                     :dst dst
-                     :op-id op-id
-                     :core-op (cond ((eq direction 'tx) :tx)
-                                    ((eq direction 'rx) :rx)
-                                    (t
-                                     (assert "Unable to grasp the direction"))))))
+  (make-sexpr-step
+   :channel-id  (gassoc :channel-name (gassoc :communicators form))
+   :core-id (gassoc :id form )
+   :src (gassoc :sender (gassoc :communicators form))
+   :dst (gassoc :receiver (gassoc :communicators form))
+   :op-id (gassoc :sequence-id form)
+   :core-op (gassoc :type form)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Semantic run.
@@ -695,17 +697,41 @@ Expects something of the form  *resource-parsing-string*
   :superclasses '(semantic-run)
   :undecorated t)
 
-(defobject semantic-sexpr-run ((container nil) sequence-cache)
-  :documentation "Contains a list of sexpr-based ops"
+(defobject semantic-sexpr-run
+    ((container nil)
+     core-list
+     channels)
+  :documentation
+  "Contains information on sexpr-based ops, organized into a list of
+  vectors, one vector per core.
+
+Each element in core-list is index-linked to the list of vectors.
+
+Further, channels contains a list of channels that were communicated
+upon."
   :superclasses '(semantic-run)
   :undecorated t)
 
 (defun parse-sexpr-file (data)
-  (make-semantic-sexpr-run
-   :container  (mapcar #'parse-sexpr
-                       (loop for d in data
-                             append d))))
-
+  (declare (optimize (speed 3) (space 0) (debug 1)))
+  (let ((run (make-semantic-sexpr-run)))
+    (setf (container run)
+          (loop for core in data
+             collect
+               (progn
+                 (push (car core) (core-list run))
+                 (sort
+                 (concatenate
+                  'vector
+                  (mapcar #'parse-sexpr (cdr core)))
+                 #'<
+                 :key #'u-id))))
+    (setf (core-list run) (reverse (core-list run)))
+    (setf (channels run)
+          (uniqueize (loop for core in (container run)
+                        append
+                          (map 'list #'channel-id core))))
+    run))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmethod printme ((obj semantic-run))
@@ -843,6 +869,7 @@ core"
            core))
       (container object)))
     filtered-run))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Useful when looking for an instruction to examine at leisure

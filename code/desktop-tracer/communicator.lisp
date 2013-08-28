@@ -243,9 +243,9 @@
 (defmethod new-channel ((sender core) (receiver core))
   "Creates a channel connecting `sender` and `receiver`"
   (let ((channel (make-channel
-                  (format nil "~a ~~> ~a"
-                          (name sender)
-                          (name receiver)))))
+                  (list (cons :channel-name (gentemp "C" 'KEYWORD))
+                        (cons :sender (name sender))
+                        (cons :receiver (name receiver))))))
     (configure-channel channel sender receiver)
     channel))
 
@@ -411,17 +411,17 @@ writing to a file."
 
   (loop for id in (alexandria:hash-table-keys history)
         collect
-        (list
-         (cons :thread id)
-         (cons :data
-               (loop for comm in  (gethash id history)
-                  collect
-                    (list (cons :name
-                                (second comm))
-                          (cons :sequence-id
-                                (fourth comm))
-                          (cons :type
-                                (third comm)) ))))))
+       (cons id
+             (loop for comm in  (gethash id history)
+                collect
+                  (list
+                   (cons :id id)
+                   (cons :communicators
+                         (second comm))
+                   (cons :sequence-id
+                         (fourth comm))
+                   (cons :type
+                         (third comm)) )))))
 
 
 (defun write-history (history filename)
