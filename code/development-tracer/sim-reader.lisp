@@ -211,6 +211,7 @@ instruction: returns a `lexical-instruction` object"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Simulation superclass object
+;; the comm node is the arbitrary analysis node.
 (defobject:defobject comm-node
     (core
      operation
@@ -1405,7 +1406,8 @@ communicating on."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun all-paths (start end)
-  (let ((stack (list (list start (list start)))) ; list of (node path) elements
+  (let ((stack (list (list start (list start)))) ; list of (node path)
+                                                 ; elements
         (allpaths '()))
     (do  ()
       ((not stack))

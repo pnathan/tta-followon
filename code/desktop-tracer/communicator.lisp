@@ -429,3 +429,9 @@ writing to a file."
    (format nil "~s" (emit-readable-history history))
    filename
    :if-exists :overwrite))
+
+
+(defun record-pc-run ()
+  "Record a producer-consumer run as a single entry point into the system"
+  (do-pc)
+  (write-history *history* "pc-data.sexpr"))
